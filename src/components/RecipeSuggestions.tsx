@@ -21,12 +21,14 @@ export default function RecipeSuggestions({
   const [ingredients, setIngredients] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expandedRecipe, setExpandedRecipe] = useState<number | null>(null);
 
   const fetchRecipes = async () => {
     if (!ingredients.trim()) return;
     setLoading(true);
     setRecipes([]);
+    setError(null);
     try {
       const res = await fetch("/api/suggest-recipes", {
         method: "POST",
@@ -34,9 +36,16 @@ export default function RecipeSuggestions({
         body: JSON.stringify({ ingredients, remainingCalories }),
       });
       const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Tarifler alınamadı");
+
       setRecipes(data.recipes || []);
-    } catch {
-      /* handled by empty state */
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Tarifler alınamadı. Lütfen tekrar deneyin."
+      );
     } finally {
       setLoading(false);
     }
@@ -67,6 +76,18 @@ export default function RecipeSuggestions({
           )}
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+          <p className="text-danger text-sm">{error}</p>
+          <button
+            onClick={fetchRecipes}
+            className="mt-2 text-sm text-primary font-medium"
+          >
+            Tekrar Dene
+          </button>
+        </div>
+      )}
 
       {recipes.map((recipe, i) => (
         <div
