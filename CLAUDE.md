@@ -60,7 +60,7 @@ All app state is managed in `src/app/page.tsx` via `useState`. No state manageme
 
 All three API routes follow the same pattern:
 1. Accept POST with JSON body
-2. Call Claude API (`claude-sonnet-4-20250514`) with a Turkish-language prompt requesting structured JSON output
+2. Call Claude API (`claude-sonnet-4-6`) with a Turkish-language prompt requesting structured JSON output
 3. Extract JSON from response via regex (`/\{[\s\S]*\}/`)
 4. Return parsed JSON to client
 
