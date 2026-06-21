@@ -18,6 +18,14 @@ function getTodayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
+function getTodayDisplay() {
+  return new Date().toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    weekday: "long",
+  });
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("tracker");
   const [target, setTarget] = useState(2000);
@@ -80,14 +88,14 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Analiz başarısız");
+      if (!res.ok) throw new Error(data.error || "Analiz basarisiz");
 
       setAnalysisResult(data);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Fotoğraf analiz edilemedi. Lütfen tekrar deneyin."
+          : "Fotograf analiz edilemedi. Lutfen tekrar deneyin."
       );
     } finally {
       setAnalyzing(false);
@@ -139,45 +147,50 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto w-full">
       {/* Header */}
-      <header className="bg-primary text-white px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold">KaloriTakip</h1>
-        <button
-          onClick={() => {
-            setEditingTarget(true);
-            setTempTarget(String(target));
-          }}
-          className="text-sm bg-white/20 px-3 py-1 rounded-full"
-        >
-          Hedef: {target} kcal
-        </button>
+      <header className="bg-gradient-to-br from-primary to-primary-dark text-white px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-extrabold tracking-tight">KaloriTakip</h1>
+            <p className="text-xs text-white/60 mt-0.5">{getTodayDisplay()}</p>
+          </div>
+          <button
+            onClick={() => {
+              setEditingTarget(true);
+              setTempTarget(String(target));
+            }}
+            className="text-xs font-semibold bg-white/15 backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-white/20 active:bg-white/25 transition-colors"
+          >
+            Hedef: {target} kcal
+          </button>
+        </div>
       </header>
 
       {/* Target Edit Modal */}
       {editingTarget && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h2 className="font-bold text-lg mb-4">Günlük Kalori Hedefi</h2>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-card-bg rounded-2xl p-6 w-full max-w-sm shadow-xl animate-scale-in">
+            <h2 className="font-bold text-lg mb-4">Gunluk Kalori Hedefi</h2>
             <input
               type="number"
               value={tempTarget}
               onChange={(e) => setTempTarget(e.target.value)}
-              className="w-full border border-border rounded-xl p-3 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-border rounded-xl p-3 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
               min="500"
               max="10000"
             />
-            <div className="text-xs text-gray-500 text-center mt-2">
-              Önerilen: Kadın 1800-2200 / Erkek 2200-2800 kcal
+            <div className="text-xs text-muted text-center mt-2">
+              Onerilen: Kadin 1800-2200 / Erkek 2200-2800 kcal
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-5">
               <button
                 onClick={() => setEditingTarget(false)}
-                className="flex-1 py-2.5 rounded-xl border border-border font-medium"
+                className="flex-1 py-2.5 rounded-xl border border-border font-semibold text-sm active:bg-background transition-colors"
               >
-                İptal
+                Iptal
               </button>
               <button
                 onClick={saveTarget}
-                className="flex-1 py-2.5 rounded-xl bg-primary text-white font-medium"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm active:scale-[0.98] transition-transform shadow-sm"
               >
                 Kaydet
               </button>
@@ -188,24 +201,14 @@ export default function Home() {
 
       {/* Analysis Modal */}
       {(previewImage || analyzing) && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-          <div className="bg-white rounded-t-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
-            <div className="p-4">
-              <div className="flex justify-between items-center mb-3">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center animate-fade-in">
+          <div className="bg-card-bg rounded-t-3xl w-full max-w-md max-h-[85vh] overflow-y-auto animate-slide-up shadow-2xl">
+            <div className="p-5">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold text-lg">Yemek Analizi</h2>
-                <button onClick={cancelAnalysis} className="text-gray-400 p-1">
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                <button onClick={cancelAnalysis} className="w-8 h-8 rounded-full bg-background flex items-center justify-center active:bg-border transition-colors">
+                  <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -214,27 +217,27 @@ export default function Home() {
                 <img
                   src={previewImage}
                   alt="Yiyecek"
-                  className="w-full h-48 object-cover rounded-xl mb-4"
+                  className="w-full h-48 object-cover rounded-2xl mb-4"
                 />
               )}
 
               {analyzing && (
-                <div className="flex flex-col items-center py-8">
-                  <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-gray-500">AI analiz ediyor...</p>
+                <div className="flex flex-col items-center py-10">
+                  <div className="w-12 h-12 border-3 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
+                  <p className="text-sm text-muted font-medium">AI analiz ediyor...</p>
                 </div>
               )}
 
               {error && (
-                <div className="bg-red-50 text-danger p-4 rounded-xl text-sm space-y-3">
-                  <p>{error}</p>
+                <div className="bg-danger-light/50 text-danger p-4 rounded-2xl text-sm space-y-3 border border-danger/10">
+                  <p className="font-medium">{error}</p>
                   <button
                     onClick={() => {
                       if (previewImage) {
                         handleCapture(previewImage);
                       }
                     }}
-                    className="w-full py-2 rounded-lg bg-danger text-white font-medium text-sm active:scale-[0.98] transition-transform"
+                    className="w-full py-2.5 rounded-xl bg-danger text-white font-semibold text-sm active:scale-[0.98] transition-transform"
                   >
                     Tekrar Dene
                   </button>
@@ -242,52 +245,55 @@ export default function Home() {
               )}
 
               {analysisResult && (
-                <div className="space-y-3">
+                <div className="space-y-3 animate-fade-in-up">
                   {analysisResult.items.map((item, i) => (
                     <div
                       key={i}
-                      className="bg-background rounded-xl p-3 border border-border"
+                      className="bg-background rounded-xl p-3.5 border border-border"
                     >
-                      <div className="flex justify-between">
-                        <div className="font-medium">{item.name}</div>
-                        <div className="font-bold text-primary">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold text-sm">{item.name}</div>
+                          <div className="text-xs text-muted mt-0.5">{item.portion}</div>
+                        </div>
+                        <div className="font-bold text-primary text-sm">
                           {item.calories} kcal
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {item.portion}
-                      </div>
-                      <div className="flex gap-4 text-xs text-gray-400 mt-2">
-                        <span>Protein: {item.protein}g</span>
-                        <span>Karb: {item.carbs}g</span>
-                        <span>Yağ: {item.fat}g</span>
+                      <div className="flex gap-2 mt-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium">P {item.protein}g</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-medium">K {item.carbs}g</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium">Y {item.fat}g</span>
                       </div>
                     </div>
                   ))}
 
-                  <div className="bg-primary/10 rounded-xl p-3 text-center">
-                    <span className="text-sm text-gray-600">Toplam: </span>
-                    <span className="text-xl font-bold text-primary">
+                  <div className="bg-primary-light/50 rounded-xl p-3.5 text-center border border-primary/10">
+                    <span className="text-xs text-primary-dark/60">Toplam: </span>
+                    <span className="text-xl font-extrabold text-primary">
                       {analysisResult.totalCalories} kcal
                     </span>
                   </div>
 
                   {analysisResult.notes && (
-                    <p className="text-xs text-gray-500 bg-yellow-50 p-2 rounded-lg">
-                      {analysisResult.notes}
-                    </p>
+                    <div className="flex gap-2 bg-amber-50 p-3 rounded-xl border border-amber-100">
+                      <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs text-amber-700">{analysisResult.notes}</p>
+                    </div>
                   )}
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 pt-1">
                     <button
                       onClick={cancelAnalysis}
-                      className="flex-1 py-2.5 rounded-xl border border-border font-medium"
+                      className="flex-1 py-3 rounded-xl border border-border font-semibold text-sm active:bg-background transition-colors"
                     >
-                      İptal
+                      Iptal
                     </button>
                     <button
                       onClick={confirmAnalysis}
-                      className="flex-1 py-2.5 rounded-xl bg-primary text-white font-medium active:scale-[0.98] transition-transform"
+                      className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm active:scale-[0.98] transition-transform shadow-sm"
                     >
                       Ekle
                     </button>
@@ -300,26 +306,26 @@ export default function Home() {
       )}
 
       {/* Tab Navigation */}
-      <nav className="flex border-b border-border bg-card-bg">
+      <nav className="flex bg-card-bg px-2 pt-1 border-b border-border">
         <button
           onClick={() => setTab("tracker")}
-          className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all duration-200 ${
             tab === "tracker"
               ? "border-primary text-primary"
-              : "border-transparent text-gray-500"
+              : "border-transparent text-muted"
           }`}
         >
           Kalori Takip
         </button>
         <button
           onClick={() => setTab("recipes")}
-          className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all duration-200 ${
             tab === "recipes"
               ? "border-primary text-primary"
-              : "border-transparent text-gray-500"
+              : "border-transparent text-muted"
           }`}
         >
-          Yemek Önerisi
+          Yemek Onerisi
         </button>
       </nav>
 
@@ -334,7 +340,7 @@ export default function Home() {
             )}
 
             <div>
-              <h2 className="font-semibold mb-2">Bugün Yediklerim</h2>
+              <h2 className="font-bold text-sm mb-3 text-foreground/80">Bugun Yediklerim</h2>
               <DailyTimeline items={foods} onRemove={removeFood} />
             </div>
           </div>
