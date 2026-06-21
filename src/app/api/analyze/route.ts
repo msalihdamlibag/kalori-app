@@ -81,8 +81,47 @@ Porsiyon tahmininde tabaktaki miktarı dikkate al. Paketli gıdaysa ambalaj bilg
     return NextResponse.json(analysis);
   } catch (error) {
     console.error("Analiz hatası:", error);
+
+    if (error instanceof Anthropic.APIError) {
+      if (error.status === 401) {
+        return NextResponse.json(
+          { error: "API anahtarı geçersiz. Lütfen ayarları kontrol edin." },
+          { status: 500 }
+        );
+      }
+      if (error.status === 429) {
+        return NextResponse.json(
+          { error: "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin." },
+          { status: 429 }
+        );
+      }
+      if (error.status === 400) {
+        return NextResponse.json(
+          { error: "Görsel işlenemedi. Lütfen farklı bir fotoğraf çekmeyi deneyin." },
+          { status: 400 }
+        );
+      }
+      if (error.status === 529) {
+        return NextResponse.json(
+          { error: "AI servisi şu anda meşgul. Lütfen birkaç dakika sonra tekrar deneyin." },
+          { status: 503 }
+        );
+      }
+      return NextResponse.json(
+        { error: `AI servisi hatası (${error.status}). Lütfen daha sonra tekrar deneyin.` },
+        { status: error.status || 500 }
+      );
+    }
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: "AI yanıtı işlenemedi. Lütfen tekrar deneyin." },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Analiz sırasında hata oluştu" },
+      { error: "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin." },
       { status: 500 }
     );
   }

@@ -225,8 +225,18 @@ export default function Home() {
               )}
 
               {error && (
-                <div className="bg-red-50 text-danger p-3 rounded-xl text-sm">
-                  {error}
+                <div className="bg-red-50 text-danger p-4 rounded-xl text-sm space-y-3">
+                  <p>{error}</p>
+                  <button
+                    onClick={() => {
+                      if (previewImage) {
+                        handleCapture(previewImage);
+                      }
+                    }}
+                    className="w-full py-2 rounded-lg bg-danger text-white font-medium text-sm active:scale-[0.98] transition-transform"
+                  >
+                    Tekrar Dene
+                  </button>
                 </div>
               )}
 
