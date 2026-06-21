@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import CalorieRing from "@/components/CalorieRing";
-import FoodLog, { FoodItem } from "@/components/FoodLog";
+import { FoodItem } from "@/components/FoodLog";
+import DailyTimeline from "@/components/DailyTimeline";
 import CameraCapture from "@/components/CameraCapture";
 import ExerciseSuggestions from "@/components/ExerciseSuggestions";
 import RecipeSuggestions from "@/components/RecipeSuggestions";
@@ -334,7 +335,7 @@ export default function Home() {
 
             <div>
               <h2 className="font-semibold mb-2">Bugün Yediklerim</h2>
-              <FoodLog items={foods} onRemove={removeFood} />
+              <DailyTimeline items={foods} onRemove={removeFood} />
             </div>
           </div>
         )}
