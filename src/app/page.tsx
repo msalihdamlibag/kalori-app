@@ -89,6 +89,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState("");
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -118,7 +119,21 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foods));
+    try {
+      const foodsForStorage = foods.map((f) => ({
+        ...f,
+        imageUrl: f.imageUrl?.startsWith("data:") ? undefined : f.imageUrl,
+      }));
+      localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foodsForStorage));
+    } catch {
+      // localStorage full — skip image URLs entirely
+      try {
+        const minimal = foods.map(({ imageUrl: _, ...rest }) => rest);
+        localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(minimal));
+      } catch {
+        // Still fails — nothing we can do
+      }
+    }
 
     if (!deviceId) return;
 
@@ -167,20 +182,14 @@ export default function Home() {
   }, []);
 
   const confirmAnalysis = async () => {
-    if (!analysisResult) return;
+    if (!analysisResult || adding) return;
+    setAdding(true);
 
-    // Upload photo to Blob in background, fall back to base64
-    let photoUrl = previewImage || undefined;
+    // Upload photo to Blob first, fall back to no image (never store base64 in state)
+    let photoUrl: string | undefined;
     if (previewImage) {
-      uploadPhoto(previewImage).then((url) => {
-        if (url !== previewImage) {
-          setFoods((prev) =>
-            prev.map((f) =>
-              f.imageUrl === previewImage ? { ...f, imageUrl: url } : f
-            )
-          );
-        }
-      });
+      const uploaded = await uploadPhoto(previewImage);
+      photoUrl = uploaded.startsWith("data:") ? undefined : uploaded;
     }
 
     const newItems: FoodItem[] = analysisResult.items.map((item) => ({
@@ -202,6 +211,7 @@ export default function Home() {
     setPreviewImage(null);
     setAnalysisResult(null);
     setEditingItemIndex(null);
+    setAdding(false);
   };
 
   const cancelAnalysis = () => {
@@ -494,9 +504,17 @@ export default function Home() {
                     </button>
                     <button
                       onClick={confirmAnalysis}
-                      className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm active:scale-[0.98] transition-transform shadow-sm"
+                      disabled={adding}
+                      className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-dark text-white font-semibold text-sm active:scale-[0.98] transition-transform shadow-sm disabled:opacity-60"
                     >
-                      Ekle
+                      {adding ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Ekleniyor...
+                        </span>
+                      ) : (
+                        "Ekle"
+                      )}
                     </button>
                   </div>
                 </div>
