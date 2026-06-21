@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import CalorieRing from "@/components/CalorieRing";
 import { FoodItem } from "@/components/FoodLog";
 import DailyTimeline from "@/components/DailyTimeline";
 import CameraCapture from "@/components/CameraCapture";
 import ExerciseSuggestions from "@/components/ExerciseSuggestions";
 import RecipeSuggestions from "@/components/RecipeSuggestions";
+import HistoryView from "@/components/HistoryView";
 
-type Tab = "tracker" | "recipes";
+type Tab = "tracker" | "history" | "recipes";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
 const STORAGE_KEY_TARGET = "kalori-target";
 const STORAGE_KEY_DATE = "kalori-date";
+const STORAGE_KEY_DEVICE = "kalori-device-id";
 
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
@@ -24,6 +26,42 @@ function getTodayDisplay() {
     month: "long",
     weekday: "long",
   });
+}
+
+function getDeviceId(): string {
+  let id = localStorage.getItem(STORAGE_KEY_DEVICE);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEY_DEVICE, id);
+  }
+  return id;
+}
+
+async function uploadPhoto(imageData: string): Promise<string> {
+  try {
+    const res = await fetch("/api/upload-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageData }),
+    });
+    if (!res.ok) return imageData;
+    const data = await res.json();
+    return data.url || imageData;
+  } catch {
+    return imageData;
+  }
+}
+
+async function syncToDb(deviceId: string, date: string, target: number, foods: FoodItem[]) {
+  try {
+    await fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, date, target, foods }),
+    });
+  } catch {
+    // Silently fail — localStorage is the primary store
+  }
 }
 
 export default function Home() {
@@ -47,12 +85,23 @@ export default function Home() {
     notes?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState("");
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
+    const id = getDeviceId();
+    setDeviceId(id);
+
     const savedDate = localStorage.getItem(STORAGE_KEY_DATE);
     const today = getTodayStr();
 
     if (savedDate !== today) {
+      // Sync previous day before resetting
+      const oldFoods = localStorage.getItem(STORAGE_KEY_FOODS);
+      if (savedDate && oldFoods) {
+        const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
+        syncToDb(id, savedDate, Number(savedTarget) || 2000, JSON.parse(oldFoods));
+      }
       localStorage.setItem(STORAGE_KEY_DATE, today);
       localStorage.removeItem(STORAGE_KEY_FOODS);
       setFoods([]);
@@ -67,7 +116,19 @@ export default function Home() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foods));
-  }, [foods]);
+
+    if (!deviceId) return;
+
+    // Debounced sync to DB
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      syncToDb(deviceId, getTodayStr(), target, foods);
+    }, 3000);
+
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+  }, [foods, deviceId, target]);
 
   const consumed = foods.reduce((sum, f) => sum + f.calories, 0);
   const remaining = target - consumed;
@@ -102,8 +163,22 @@ export default function Home() {
     }
   }, []);
 
-  const confirmAnalysis = () => {
+  const confirmAnalysis = async () => {
     if (!analysisResult) return;
+
+    // Upload photo to Blob in background, fall back to base64
+    let photoUrl = previewImage || undefined;
+    if (previewImage) {
+      uploadPhoto(previewImage).then((url) => {
+        if (url !== previewImage) {
+          setFoods((prev) =>
+            prev.map((f) =>
+              f.imageUrl === previewImage ? { ...f, imageUrl: url } : f
+            )
+          );
+        }
+      });
+    }
 
     const newItems: FoodItem[] = analysisResult.items.map((item) => ({
       id: crypto.randomUUID(),
@@ -117,7 +192,7 @@ export default function Home() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      imageUrl: previewImage || undefined,
+      imageUrl: photoUrl,
     }));
 
     setFoods((prev) => [...prev, ...newItems]);
@@ -315,7 +390,17 @@ export default function Home() {
               : "border-transparent text-muted"
           }`}
         >
-          Kalori Takip
+          Takip
+        </button>
+        <button
+          onClick={() => setTab("history")}
+          className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all duration-200 ${
+            tab === "history"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted"
+          }`}
+        >
+          Gecmis
         </button>
         <button
           onClick={() => setTab("recipes")}
@@ -325,7 +410,7 @@ export default function Home() {
               : "border-transparent text-muted"
           }`}
         >
-          Yemek Onerisi
+          Tarifler
         </button>
       </nav>
 
@@ -344,6 +429,10 @@ export default function Home() {
               <DailyTimeline items={foods} onRemove={removeFood} />
             </div>
           </div>
+        )}
+
+        {tab === "history" && deviceId && (
+          <HistoryView deviceId={deviceId} />
         )}
 
         {tab === "recipes" && (
