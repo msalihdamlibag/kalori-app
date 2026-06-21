@@ -1,19 +1,24 @@
 import { sql } from "@vercel/postgres";
 import { NextRequest, NextResponse } from "next/server";
-import { ensureTables } from "@/lib/db";
+import { ensureTables, isDbConfigured } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
-    if (!process.env.POSTGRES_URL) {
-      return NextResponse.json({ error: "Veritabani yapilandirilmamis" }, { status: 503 });
+    if (!isDbConfigured()) {
+      return NextResponse.json(
+        { error: "Veritabani yapilandirilmamis", detail: "POSTGRES_URL ortam degiskeni bulunamadi" },
+        { status: 503 }
+      );
     }
 
     await ensureTables();
 
     const { searchParams } = new URL(req.url);
     const deviceId = searchParams.get("deviceId");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "30"), 90);
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const limitParam = parseInt(searchParams.get("limit") || "30");
+    const offsetParam = parseInt(searchParams.get("offset") || "0");
+    const safeLimit = Math.min(Math.max(limitParam, 1), 90);
+    const safeOffset = Math.max(offsetParam, 0);
 
     if (!deviceId) {
       return NextResponse.json({ error: "deviceId gerekli" }, { status: 400 });
@@ -24,7 +29,7 @@ export async function GET(req: NextRequest) {
       FROM daily_logs
       WHERE device_id = ${deviceId}
       ORDER BY date DESC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
     `;
 
     const days = [];
@@ -60,7 +65,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ days });
   } catch (error) {
-    console.error("History hatasi:", error);
-    return NextResponse.json({ error: "Gecmis yuklenemedi" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+    console.error("History hatasi:", message);
+    return NextResponse.json(
+      { error: "Gecmis yuklenemedi", detail: message },
+      { status: 500 }
+    );
   }
 }

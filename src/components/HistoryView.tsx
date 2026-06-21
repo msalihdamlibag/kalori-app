@@ -71,7 +71,7 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
       }
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.detail || data.error || "Bilinmeyen hata");
 
       const newDays = data.days || [];
       if (offset === 0) {
@@ -80,8 +80,9 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
         setDays((prev) => [...prev, ...newDays]);
       }
       setHasMore(newDays.length === 30);
-    } catch {
-      setError("Gecmis yuklenemedi. Lutfen tekrar deneyin.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Bilinmeyen hata";
+      setError(`Gecmis yuklenemedi: ${msg}`);
     } finally {
       setLoading(false);
     }

@@ -54,13 +54,15 @@ async function uploadPhoto(imageData: string): Promise<string> {
 
 async function syncToDb(deviceId: string, date: string, target: number, foods: FoodItem[]) {
   try {
-    await fetch("/api/sync", {
+    const res = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceId, date, target, foods }),
     });
-  } catch {
-    // Silently fail — localStorage is the primary store
+    const data = await res.json();
+    if (!res.ok) console.warn("Sync hatasi:", data.detail || data.error);
+  } catch (e) {
+    console.warn("Sync baglanti hatasi:", e);
   }
 }
 
