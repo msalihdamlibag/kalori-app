@@ -77,12 +77,17 @@ export default function Home() {
         body: JSON.stringify({ image: imageData }),
       });
 
-      if (!res.ok) throw new Error("Analiz başarısız");
-
       const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Analiz başarısız");
+
       setAnalysisResult(data);
-    } catch {
-      setError("Fotoğraf analiz edilemedi. Lütfen tekrar deneyin.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Fotoğraf analiz edilemedi. Lütfen tekrar deneyin."
+      );
     } finally {
       setAnalyzing(false);
     }
