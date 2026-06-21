@@ -1,10 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const client = new Anthropic();
-
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json(
+        { error: "API anahtarı yapılandırılmamış" },
+        { status: 500 }
+      );
+    }
+
+    const client = new Anthropic();
     const { ingredients, remainingCalories } = await req.json();
 
     const response = await client.messages.create({
