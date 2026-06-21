@@ -83,7 +83,6 @@ export default function Home() {
       setAnalysisResult(data);
     } catch {
       setError("Fotoğraf analiz edilemedi. Lütfen tekrar deneyin.");
-      setPreviewImage(null);
     } finally {
       setAnalyzing(false);
     }
