@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #1e293b;
-  --primary: #10b981;
-  --primary-dark: #059669;
-  --danger: #ef4444;
-  --warning: #f59e0b;
+  --background: #f0f4f3;
+  --foreground: #1a2e2a;
+  --primary: #0d9f6e;
+  --primary-dark: #047d56;
+  --primary-light: #d1fae5;
+  --danger: #e53e3e;
+  --danger-light: #fed7d7;
+  --warning: #dd6b20;
   --card-bg: #ffffff;
-  --border: #e2e8f0;
+  --border: #e2ebe8;
+  --muted: #8fa8a0;
 }
 
 @theme inline {
@@ -16,10 +19,13 @@
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
   --color-danger: var(--danger);
+  --color-danger-light: var(--danger-light);
   --color-warning: var(--warning);
   --color-card-bg: var(--card-bg);
   --color-border: var(--border);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -43,4 +49,62 @@ input, textarea {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.25s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out both;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }

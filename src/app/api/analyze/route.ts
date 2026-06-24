@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const mediaType = image.match(/^data:(image\/\w+);/)?.[1] || "image/jpeg";
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [
         {
