@@ -218,6 +218,49 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
                 className="bg-card-bg rounded-2xl border border-border shadow-sm overflow-hidden animate-fade-in-up"
                 style={{ animationDelay: `${idx * 40}ms` }}
               >
+                {/* Photo strip preview (collapsed) */}
+                {!isExpanded && uniquePhotos.length > 0 && (
+                  <div className="flex overflow-hidden">
+                    {uniquePhotos.slice(0, 4).map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setFullscreenImage(url)}
+                        className="relative flex-1 min-w-0"
+                      >
+                        <img
+                          src={url}
+                          alt="Ogun"
+                          className="w-full h-24 object-cover"
+                        />
+                        {i === 3 && uniquePhotos.length > 4 && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <span className="text-white text-sm font-bold">+{uniquePhotos.length - 4}</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expanded photo gallery */}
+                {isExpanded && uniquePhotos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto p-3 pb-0">
+                    {uniquePhotos.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setFullscreenImage(url)}
+                        className="shrink-0 rounded-xl overflow-hidden"
+                      >
+                        <img
+                          src={url}
+                          alt="Ogun"
+                          className="w-28 h-28 object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <button
                   onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                   className="w-full p-4 text-left"
@@ -248,28 +291,20 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
 
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-border pt-3 space-y-3 animate-fade-in-up">
-                    {/* Photo gallery */}
-                    {uniquePhotos.length > 0 && (
-                      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                        {uniquePhotos.map((url, i) => (
+                    {day.foods.map((food) => (
+                      <div key={food.id} className="flex items-start gap-2.5 bg-background rounded-xl p-2.5">
+                        {food.imageUrl && (
                           <button
-                            key={i}
-                            onClick={() => setFullscreenImage(url)}
-                            className="shrink-0"
+                            onClick={() => setFullscreenImage(food.imageUrl!)}
+                            className="shrink-0 rounded-lg overflow-hidden"
                           >
                             <img
-                              src={url}
-                              alt="Ogun"
-                              className="w-20 h-20 rounded-xl object-cover"
+                              src={food.imageUrl}
+                              alt={food.name}
+                              className="w-14 h-14 object-cover"
                             />
                           </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Food items */}
-                    {day.foods.map((food) => (
-                      <div key={food.id} className="flex items-start justify-between bg-background rounded-xl p-2.5">
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold truncate">{food.name}</div>
                           <div className="text-xs text-muted mt-0.5">{food.portion}</div>
@@ -279,7 +314,7 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium">Y {food.fat}g</span>
                           </div>
                         </div>
-                        <div className="shrink-0 ml-2 text-right">
+                        <div className="shrink-0 ml-1 text-right">
                           <span className="text-sm font-bold text-primary">{food.calories}</span>
                           <div className="text-[10px] text-muted">{food.time}</div>
                         </div>
