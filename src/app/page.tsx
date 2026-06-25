@@ -562,7 +562,7 @@ export default function Home() {
       <main className="flex-1 overflow-y-auto p-4 pb-24">
         {tab === "tracker" && (
           <div className="space-y-4">
-            <CalorieRing consumed={consumed} target={target} />
+            <CalorieRing consumed={consumed} target={target} foods={foods} />
 
             {isOver && (
               <ExerciseSuggestions excessCalories={consumed - target} />
