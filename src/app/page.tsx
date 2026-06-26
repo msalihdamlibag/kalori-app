@@ -54,10 +54,15 @@ async function uploadPhoto(imageData: string): Promise<string> {
 
 async function syncToDb(deviceId: string, date: string, target: number, foods: FoodItem[]) {
   try {
+    // Never send base64 data URLs to the DB — only hosted image URLs persist.
+    const foodsForSync = foods.map((f) => ({
+      ...f,
+      imageUrl: f.imageUrl?.startsWith("data:") ? undefined : f.imageUrl,
+    }));
     const res = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId, date, target, foods }),
+      body: JSON.stringify({ deviceId, date, target, foods: foodsForSync }),
     });
     const data = await res.json();
     if (!res.ok) console.warn("Sync hatasi:", data.detail || data.error);
@@ -185,11 +190,14 @@ export default function Home() {
     if (!analysisResult || adding) return;
     setAdding(true);
 
-    // Upload photo to Blob first, fall back to no image (never store base64 in state)
+    // Upload photo to Blob first. If Blob isn't configured the upload falls
+    // back to the base64 data URL, which we keep in memory so the photo still
+    // shows this session. The localStorage and sync layers strip data: URLs
+    // before persisting, so this never blows the storage quota or bloats the DB.
     let photoUrl: string | undefined;
     if (previewImage) {
       const uploaded = await uploadPhoto(previewImage);
-      photoUrl = uploaded.startsWith("data:") ? undefined : uploaded;
+      photoUrl = uploaded || undefined;
     }
 
     const newItems: FoodItem[] = analysisResult.items.map((item) => ({
