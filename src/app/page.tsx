@@ -524,7 +524,7 @@ export default function Home() {
               macroTargets={macroTargets}
             />
             <FreeAccessBanner daysLeft={daysLeft} totalDays={FREE_TRIAL_DAYS} />
-            <StorySection />
+            <StorySection foods={foods} />
             <div>
               <h2 className="text-xl font-extrabold mb-3">Bugün Yediklerim</h2>
               <DailyTimeline items={foods} onRemove={removeFood} />

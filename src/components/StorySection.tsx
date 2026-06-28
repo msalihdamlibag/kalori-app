@@ -1,176 +1,60 @@
 "use client";
 
 import { useState } from "react";
+import { FoodItem } from "./FoodLog";
 
-interface StoryRecipe {
-  name: string;
-  emoji: string;
-  gradient: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  prepTime: string;
-  ingredients: string[];
-  steps: string[];
+interface StorySectionProps {
+  foods: FoodItem[];
 }
 
-// Curated recipe "stories" shown on the home screen.
-const RECIPES: StoryRecipe[] = [
-  {
-    name: "Avokadolu yengeç köftesi",
-    emoji: "🥑",
-    gradient: "from-lime-200 to-emerald-300",
-    calories: 251,
-    protein: 19,
-    fat: 11,
-    carbs: 18,
-    prepTime: "25 dk",
-    ingredients: ["200 g yengeç eti", "1 avokado", "1 yumurta", "2 yk galeta unu", "Roka, limon"],
-    steps: [
-      "Yengeç etini yumurta ve galeta unuyla karıştırıp köfte şekli verin.",
-      "Az zeytinyağında her iki tarafını 3-4 dakika kızartın.",
-      "Dilimlenmiş avokado ve roka ile servis edin, üzerine limon sıkın.",
-    ],
-  },
-  {
-    name: "Kinoalı hindi sandviç",
-    emoji: "🥪",
-    gradient: "from-amber-200 to-orange-300",
-    calories: 371,
-    protein: 28,
-    fat: 12,
-    carbs: 34,
-    prepTime: "15 dk",
-    ingredients: ["2 dilim tam buğday ekmek", "100 g hindi göğsü", "3 yk haşlanmış kinoa", "Domates, marul", "1 tk hardal"],
-    steps: [
-      "Hindi göğsünü baharatlayıp ızgarada pişirin.",
-      "Ekmeğin arasına hardal sürün, kinoa, hindi ve sebzeleri yerleştirin.",
-      "Hafifçe bastırıp ikiye bölerek servis edin.",
-    ],
-  },
-  {
-    name: "Izgara tavuklu buddha kasesi",
-    emoji: "🥗",
-    gradient: "from-emerald-200 to-teal-300",
-    calories: 420,
-    protein: 35,
-    fat: 14,
-    carbs: 38,
-    prepTime: "30 dk",
-    ingredients: ["150 g tavuk göğsü", "1/2 su bardağı bulgur", "Nohut, kırmızı lahana", "Avokado", "Tahin sos"],
-    steps: [
-      "Bulguru haşlayın, tavuğu ızgarada pişirip dilimleyin.",
-      "Kaseye bulgur, nohut, lahana ve avokadoyu yerleştirin.",
-      "Üzerine tavuğu ekleyip tahin sosla servis edin.",
-    ],
-  },
-  {
-    name: "Yulaflı muzlu krep",
-    emoji: "🥞",
-    gradient: "from-yellow-200 to-amber-300",
-    calories: 295,
-    protein: 14,
-    fat: 8,
-    carbs: 42,
-    prepTime: "10 dk",
-    ingredients: ["1 muz", "2 yumurta", "4 yk yulaf", "1 tk tarçın", "Bir tutam yoğurt"],
-    steps: [
-      "Muz, yumurta ve yulafı blenderdan geçirin.",
-      "Yapışmaz tavada küçük krepler halinde pişirin.",
-      "Yoğurt ve taze meyveyle servis edin.",
-    ],
-  },
-];
-
-function RecipeCard({ recipe }: { recipe: StoryRecipe }) {
-  const [open, setOpen] = useState(false);
-
+function MacroPill({ value, label }: { value: number; label: string }) {
   return (
-    <div className="bg-card-bg rounded-3xl border border-border overflow-hidden">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-4 p-3 text-left">
-        {/* Thumbnail */}
-        <div
-          className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${recipe.gradient} flex items-center justify-center shrink-0`}
-        >
-          <span className="text-4xl">{recipe.emoji}</span>
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <span className="inline-block text-sm font-bold text-accent-strong bg-accent/40 px-2.5 py-0.5 rounded-lg">
-            {recipe.calories} kcal
-          </span>
-          <h3 className="font-bold text-base mt-1.5 leading-snug truncate">{recipe.name}</h3>
-
-          <div className="flex items-stretch gap-3 mt-2">
-            <div className="flex gap-1.5">
-              <div className="w-0.5 rounded-full bg-foreground" />
-              <div>
-                <div className="text-sm font-bold leading-none">{recipe.protein} g</div>
-                <div className="text-[11px] text-muted">Protein</div>
-              </div>
-            </div>
-            <div className="flex gap-1.5">
-              <div className="w-0.5 rounded-full bg-foreground" />
-              <div>
-                <div className="text-sm font-bold leading-none">{recipe.fat} g</div>
-                <div className="text-[11px] text-muted">Yağ</div>
-              </div>
-            </div>
-            <div className="flex gap-1.5">
-              <div className="w-0.5 rounded-full bg-foreground" />
-              <div>
-                <div className="text-sm font-bold leading-none">{recipe.carbs} g</div>
-                <div className="text-[11px] text-muted">Karb.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <svg
-          className={`w-5 h-5 text-muted shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="px-4 pb-4 border-t border-border pt-3 space-y-4 animate-fade-in-up">
-          <div className="text-[11px] font-semibold text-muted">Hazırlık: {recipe.prepTime}</div>
-          <div>
-            <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Malzemeler</div>
-            <div className="space-y-1.5">
-              {recipe.ingredients.map((ing, j) => (
-                <div key={j} className="flex items-center gap-2 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent-dark shrink-0" />
-                  {ing}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Yapılışı</div>
-            <div className="space-y-2.5">
-              {recipe.steps.map((step, j) => (
-                <div key={j} className="flex gap-2.5 text-sm">
-                  <span className="w-5 h-5 rounded-full bg-accent/40 text-accent-strong text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {j + 1}
-                  </span>
-                  <span className="text-foreground/80">{step}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex gap-1.5">
+      <div className="w-0.5 rounded-full bg-foreground" />
+      <div>
+        <div className="text-sm font-bold leading-none">{Math.round(value)} g</div>
+        <div className="text-[11px] text-muted">{label}</div>
+      </div>
     </div>
   );
 }
 
-export default function StorySection() {
+function FoodCard({ food, onView }: { food: FoodItem; onView: (url: string) => void }) {
+  return (
+    <div className="bg-card-bg rounded-3xl border border-border overflow-hidden">
+      <div className="flex items-center gap-4 p-3">
+        {/* Photographed thumbnail */}
+        <button
+          onClick={() => food.imageUrl && onView(food.imageUrl)}
+          className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 active:scale-[0.97] transition-transform"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={food.imageUrl} alt={food.name} className="w-full h-full object-cover" />
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <span className="inline-block text-sm font-bold text-accent-strong bg-accent/40 px-2.5 py-0.5 rounded-lg">
+            {food.calories} kcal
+          </span>
+          <h3 className="font-bold text-base mt-1.5 leading-snug truncate">{food.name}</h3>
+
+          <div className="flex items-stretch gap-3 mt-2">
+            <MacroPill value={food.protein} label="Protein" />
+            <MacroPill value={food.fat} label="Yağ" />
+            <MacroPill value={food.carbs} label="Karb." />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function StorySection({ foods }: StorySectionProps) {
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
+  // Only foods the user actually photographed, newest first.
+  const photographed = foods.filter((f) => f.imageUrl).reverse();
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -182,11 +66,41 @@ export default function StorySection() {
         <h2 className="text-xl font-extrabold">Hikaye</h2>
       </div>
 
-      <div className="space-y-3">
-        {RECIPES.map((recipe) => (
-          <RecipeCard key={recipe.name} recipe={recipe} />
-        ))}
-      </div>
+      {photographed.length === 0 ? (
+        <div className="bg-card-bg rounded-3xl border border-border p-6 text-center">
+          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-surface flex items-center justify-center">
+            <svg className="w-7 h-7 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <p className="font-semibold text-foreground/70">Henüz yemek fotoğrafın yok</p>
+          <p className="text-sm text-muted mt-1">
+            Alttaki <span className="font-bold text-accent-strong">+</span> ile bir yemeğin fotoğrafını çek
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {photographed.map((food) => (
+            <FoodCard key={food.id} food={food} onView={setFullscreenImage} />
+          ))}
+        </div>
+      )}
+
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={fullscreenImage} alt="Yiyecek" className="max-w-full max-h-full rounded-2xl object-contain" />
+        </div>
+      )}
     </div>
   );
 }
