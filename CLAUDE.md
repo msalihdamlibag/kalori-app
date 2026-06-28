@@ -36,11 +36,17 @@ src/
 │       ├── suggest-exercise/route.ts # POST: excess calories → exercise suggestions
 │       └── suggest-recipes/route.ts  # POST: ingredients → recipe suggestions
 ├── components/
-│   ├── CalorieRing.tsx      # SVG circular progress ring (consumed vs target)
-│   ├── CameraCapture.tsx    # File input (camera) → base64 image data
-│   ├── ExerciseSuggestions.tsx # Fetches and displays exercise suggestions
-│   ├── FoodLog.tsx          # List of logged food items (exports FoodItem type)
-│   └── RecipeSuggestions.tsx # Ingredient input → AI recipe cards
+│   ├── BottomNav.tsx        # Bottom tab bar (Home/Goal/+/Workout/Profile) + center add FAB
+│   ├── SummaryCard.tsx      # Home "Özet" card: consumed total, target gauge ring, macro bars
+│   ├── FreeAccessBanner.tsx # Home free-trial countdown banner
+│   ├── StorySection.tsx     # Home "Hikaye" curated recipe story cards
+│   ├── GoalView.tsx         # Goal tab: edit calorie + macro targets (exports macrosFromCalories)
+│   ├── WorkoutView.tsx      # Workout tab: AI exercise suggestions for a burn goal
+│   ├── ProfileView.tsx      # Profile tab: stats + links to History/Recipes + reset
+│   ├── DailyTimeline.tsx    # Home: today's meals grouped into a timeline
+│   ├── HistoryView.tsx      # Past-day records (used inside ProfileView)
+│   ├── FoodLog.tsx          # Exports the shared FoodItem type
+│   └── RecipeSuggestions.tsx # Ingredient input → AI recipe cards (used inside ProfileView)
 public/
 ├── manifest.json            # PWA manifest
 └── icon-192.svg             # App icon
@@ -54,7 +60,9 @@ All app state is managed in `src/app/page.tsx` via `useState`. No state manageme
 
 - `kalori-foods` — today's food items (JSON array)
 - `kalori-target` — daily calorie target (number)
+- `kalori-macros` — daily macro targets `{ protein, carbs, fat }` in grams (JSON)
 - `kalori-date` — current date string (triggers reset on new day)
+- `kalori-register-date` — first-launch date, drives the 7-day free-access countdown
 
 ### API Routes
 
@@ -69,18 +77,21 @@ All three API routes follow the same pattern:
 ### UI/UX
 
 - Mobile-first, max-width `md` (448px), centered layout
-- Two tabs: "Kalori Takip" (tracker) and "Yemek Onerisi" (recipes)
-- Camera FAB button (bottom center) triggers food photo analysis
+- Persistent bottom navigation with four views — "Ana Sayfa" (home), "Hedef" (goal),
+  "Egzersiz" (workout), "Profil" (profile) — plus a center "+" FAB that opens the add-food sheet
+- Center "+" opens a bottom-sheet with Camera / Galeri options → food photo analysis
 - Analysis results shown in bottom sheet modal for confirmation before adding to log
 - All user-facing text is in Turkish
 
 ## Styling Conventions
 
 - Tailwind CSS v4 with `@theme inline` block in `globals.css` for custom colors
-- Custom color tokens: `primary` (#10b981 emerald), `danger` (#ef4444 red), `warning` (#f59e0b amber), `card-bg`, `border`, `background`, `foreground`
-- Use semantic color classes (`text-primary`, `bg-danger`, `border-border`) not raw color values
-- Rounded corners: `rounded-xl` for cards, `rounded-full` for buttons/pills
-- Shadows: `shadow-sm` for cards, `shadow-lg` for FAB
+- Custom color tokens: `primary` (emerald), `accent`/`accent-dark`/`accent-strong` (lime — the
+  redesigned home & bottom-nav accent), `surface` (light-gray card), `danger`, `warning`,
+  `card-bg`, `border`, `background`, `foreground`
+- Use semantic color classes (`text-accent-strong`, `bg-accent`, `bg-surface`, `border-border`) not raw color values
+- Rounded corners: `rounded-2xl`/`rounded-3xl` for cards, `rounded-full`/`rounded-xl` for buttons/pills
+- Shadows: subtle borders preferred; `shadow-[...]` for the bottom nav and FAB
 
 ## Key Conventions
 
