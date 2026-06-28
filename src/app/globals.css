@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f0f4f3;
-  --foreground: #1a2e2a;
+  --background: #ffffff;
+  --foreground: #15201c;
   --primary: #0d9f6e;
   --primary-dark: #047d56;
   --primary-light: #d1fae5;
+  /* Lime accent used by the redesigned home / bottom nav */
+  --accent: #c1f24d;
+  --accent-dark: #a3e635;
+  --accent-strong: #4d7c0f;
+  --surface: #f3f4f1;
   --danger: #e53e3e;
   --danger-light: #fed7d7;
   --warning: #dd6b20;
   --card-bg: #ffffff;
-  --border: #e2ebe8;
-  --muted: #8fa8a0;
+  --border: #ececec;
+  --muted: #9aa0a6;
 }
 
 @theme inline {
@@ -20,6 +25,10 @@
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
   --color-primary-light: var(--primary-light);
+  --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-strong: var(--accent-strong);
+  --color-surface: var(--surface);
   --color-danger: var(--danger);
   --color-danger-light: var(--danger-light);
   --color-warning: var(--warning);
