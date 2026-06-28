@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { FoodItem } from "@/components/FoodLog";
-import DailyTimeline from "@/components/DailyTimeline";
+import TodayMeals from "@/components/TodayMeals";
 import BottomNav, { View } from "@/components/BottomNav";
 import SummaryCard from "@/components/SummaryCard";
 import FreeAccessBanner from "@/components/FreeAccessBanner";
-import StorySection from "@/components/StorySection";
 import GoalView, { MacroTargets, macrosFromCalories } from "@/components/GoalView";
 import WorkoutView from "@/components/WorkoutView";
 import ProfileView from "@/components/ProfileView";
@@ -90,6 +89,12 @@ async function uploadPhoto(imageData: string): Promise<string> {
   }
 }
 
+// Inline base64 photos are kept in app state for display but must not be sent
+// to the database (too large) — replace them with undefined before syncing.
+function stripInlineImages(foods: FoodItem[]): FoodItem[] {
+  return foods.map((f) => (f.imageUrl?.startsWith("data:") ? { ...f, imageUrl: undefined } : f));
+}
+
 async function syncToDb(deviceId: string, date: string, target: number, foods: FoodItem[]) {
   try {
     const res = await fetch("/api/sync", {
@@ -145,7 +150,7 @@ export default function Home() {
       const oldFoods = localStorage.getItem(STORAGE_KEY_FOODS);
       if (savedDate && oldFoods) {
         const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
-        syncToDb(id, savedDate, Number(savedTarget) || 2000, JSON.parse(oldFoods));
+        syncToDb(id, savedDate, Number(savedTarget) || 2000, stripInlineImages(JSON.parse(oldFoods)));
       }
       localStorage.setItem(STORAGE_KEY_DATE, today);
       localStorage.removeItem(STORAGE_KEY_FOODS);
@@ -169,17 +174,23 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const foodsForStorage = foods.map((f) => ({
-        ...f,
-        imageUrl: f.imageUrl?.startsWith("data:") ? undefined : f.imageUrl,
-      }));
-      localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foodsForStorage));
+      // Keep inline photos when they fit so they persist across reloads.
+      localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foods));
     } catch {
       try {
-        const minimal = foods.map(({ imageUrl: _, ...rest }) => rest);
-        localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(minimal));
+        // Quota exceeded — drop inline base64 photos, keep any hosted URLs.
+        const stripped = foods.map((f) => ({
+          ...f,
+          imageUrl: f.imageUrl?.startsWith("data:") ? undefined : f.imageUrl,
+        }));
+        localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(stripped));
       } catch {
-        // Still fails — nothing we can do
+        try {
+          const minimal = foods.map(({ imageUrl: _, ...rest }) => rest);
+          localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(minimal));
+        } catch {
+          // Still fails — nothing we can do
+        }
       }
     }
 
@@ -187,7 +198,7 @@ export default function Home() {
 
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
-      syncToDb(deviceId, getTodayStr(), target, foods);
+      syncToDb(deviceId, getTodayStr(), target, stripInlineImages(foods));
     }, 3000);
 
     return () => {
@@ -246,10 +257,11 @@ export default function Home() {
     if (!analysisResult || adding) return;
     setAdding(true);
 
+    // Upload to Blob when configured; otherwise keep the base64 preview so the
+    // photo still shows in-session (stripped before any DB sync).
     let photoUrl: string | undefined;
     if (previewImage) {
-      const uploaded = await uploadPhoto(previewImage);
-      photoUrl = uploaded.startsWith("data:") ? undefined : uploaded;
+      photoUrl = await uploadPhoto(previewImage);
     }
 
     const newItems: FoodItem[] = analysisResult.items.map((item) => ({
@@ -524,10 +536,9 @@ export default function Home() {
               macroTargets={macroTargets}
             />
             <FreeAccessBanner daysLeft={daysLeft} totalDays={FREE_TRIAL_DAYS} />
-            <StorySection foods={foods} />
             <div>
               <h2 className="text-xl font-extrabold mb-3">Bugün Yediklerim</h2>
-              <DailyTimeline items={foods} onRemove={removeFood} />
+              <TodayMeals items={foods} onRemove={removeFood} />
             </div>
           </div>
         )}
