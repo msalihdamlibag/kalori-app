@@ -42,6 +42,18 @@ export async function getUserById(id: string): Promise<DbUser | null> {
   return (res.rows[0] as DbUser) ?? null;
 }
 
+// Fallback lookup used to heal sessions whose token lost the DB id (e.g. cookies
+// minted before the DB was reachable). Picks the oldest row for the email.
+export async function getUserByEmail(email: string): Promise<DbUser | null> {
+  const res = await sql`
+    SELECT id, provider, email, name, image, role FROM users
+    WHERE email = ${email}
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+  return (res.rows[0] as DbUser) ?? null;
+}
+
 // Set a user's role exactly once. Returns the updated row, or null if the user
 // already has a role (in which case the existing role is left untouched).
 export async function setUserRole(
