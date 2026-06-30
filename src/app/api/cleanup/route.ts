@@ -16,6 +16,8 @@ async function cleanupOldPhotos(deviceId?: string) {
     .toISOString()
     .split("T")[0];
 
+  // Keep photos for clients who are actively linked to a trainer, so the
+  // trainer doesn't lose access to their meal photos after the retention window.
   const rows = deviceId
     ? (
         await sql`
@@ -25,6 +27,10 @@ async function cleanupOldPhotos(deviceId?: string) {
           WHERE dl.device_id = ${deviceId}
             AND dl.date <= ${cutoff}
             AND fi.image_url IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM trainer_clients tc
+              WHERE tc.client_id = dl.user_id AND tc.status = 'active'
+            )
         `
       ).rows
     : (
@@ -34,6 +40,10 @@ async function cleanupOldPhotos(deviceId?: string) {
           JOIN daily_logs dl ON fi.daily_log_id = dl.id
           WHERE dl.date <= ${cutoff}
             AND fi.image_url IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM trainer_clients tc
+              WHERE tc.client_id = dl.user_id AND tc.status = 'active'
+            )
         `
       ).rows;
 

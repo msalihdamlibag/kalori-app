@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { FoodItem } from "@/components/FoodLog";
 import TodayMeals from "@/components/TodayMeals";
 import BottomNav, { View } from "@/components/BottomNav";
@@ -9,6 +10,9 @@ import FreeAccessBanner from "@/components/FreeAccessBanner";
 import GoalView, { MacroTargets, macrosFromCalories } from "@/components/GoalView";
 import WorkoutView from "@/components/WorkoutView";
 import ProfileView from "@/components/ProfileView";
+import RoleSelect from "@/components/RoleSelect";
+import TrainerDashboard from "@/components/TrainerDashboard";
+import LoginSheet from "@/components/LoginSheet";
 import { savePhoto, getPhotos, deletePhotos, prunePhotos } from "@/lib/photoStore";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
@@ -113,6 +117,9 @@ async function syncToDb(deviceId: string, date: string, target: number, foods: F
 }
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const [loginOpen, setLoginOpen] = useState(false);
+  const claimedRef = useRef(false);
   const [view, setView] = useState<View>("home");
   const [target, setTarget] = useState(2000);
   const [macroTargets, setMacroTargets] = useState<MacroTargets>(macrosFromCalories(2000));
@@ -236,6 +243,20 @@ export default function Home() {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
   }, [foods, deviceId, target]);
+
+  // On first login, attach this device's anonymous logs to the account so the
+  // user's existing history follows them (and becomes visible to a trainer).
+  useEffect(() => {
+    if (status !== "authenticated" || !deviceId || claimedRef.current) return;
+    claimedRef.current = true;
+    fetch("/api/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId }),
+    }).catch(() => {
+      claimedRef.current = false;
+    });
+  }, [status, deviceId]);
 
   const consumed = foods.reduce((sum, f) => sum + f.calories, 0);
   const protein = foods.reduce((s, f) => s + (f.protein || 0), 0);
@@ -366,6 +387,19 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY_MACROS, JSON.stringify(newMacros));
   };
 
+  const role = session?.user?.role ?? null;
+
+  // Signed-in but no role yet → force the one-time role selection.
+  if (status === "authenticated" && role === null) {
+    return <RoleSelect />;
+  }
+
+  // Trainers get a dedicated experience instead of the client tracker.
+  if (status === "authenticated" && role === "trainer") {
+    return <TrainerDashboard />;
+  }
+
+  // Anonymous or client → the calorie-tracking app below.
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto w-full bg-background">
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
@@ -609,11 +643,24 @@ export default function Home() {
             totalItems={foods.length}
             daysLeft={daysLeft}
             onReset={resetToday}
+            user={
+              session?.user
+                ? {
+                    name: session.user.name ?? null,
+                    email: session.user.email ?? null,
+                    image: session.user.image ?? null,
+                    role: session.user.role,
+                  }
+                : null
+            }
+            onLogin={() => setLoginOpen(true)}
           />
         )}
       </main>
 
       <BottomNav active={view} onChange={setView} onAdd={() => setAddMenuOpen(true)} addDisabled={analyzing} />
+
+      {loginOpen && <LoginSheet onClose={() => setLoginOpen(false)} />}
     </div>
   );
 }

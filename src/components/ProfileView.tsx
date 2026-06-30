@@ -1,8 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
 import RecipeSuggestions from "./RecipeSuggestions";
+
+interface ProfileUser {
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  role: "client" | "trainer" | null;
+}
 
 interface ProfileViewProps {
   deviceId: string;
@@ -12,9 +20,11 @@ interface ProfileViewProps {
   totalItems: number;
   daysLeft: number;
   onReset: () => void;
+  user?: ProfileUser | null;
+  onLogin: () => void;
 }
 
-type Section = "overview" | "history" | "recipes";
+type Section = "overview" | "history" | "recipes" | "connect";
 
 function MenuRow({
   icon,
@@ -76,6 +86,8 @@ export default function ProfileView({
   totalItems,
   daysLeft,
   onReset,
+  user,
+  onLogin,
 }: ProfileViewProps) {
   const [section, setSection] = useState<Section>("overview");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -84,7 +96,7 @@ export default function ProfileView({
     return (
       <div>
         <SubHeader title="Geçmiş" onBack={() => setSection("overview")} />
-        {deviceId && <HistoryView deviceId={deviceId} />}
+        {(deviceId || user) && <HistoryView deviceId={deviceId} />}
       </div>
     );
   }
@@ -98,24 +110,52 @@ export default function ProfileView({
     );
   }
 
+  if (section === "connect") {
+    return (
+      <div>
+        <SubHeader title="Eğitmene Bağlan" onBack={() => setSection("overview")} />
+        <ConnectTrainer />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-extrabold">Profil</h1>
 
       {/* Profile card */}
       <div className="bg-surface rounded-3xl p-5 flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center shrink-0">
-          <svg className="w-8 h-8 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-            <circle cx="12" cy="8" r="3.5" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 20c0-3.5 3.13-6 7-6s7 2.5 7 6" />
-          </svg>
+        <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center shrink-0 overflow-hidden">
+          {user?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.image} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <svg className="w-8 h-8 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <circle cx="12" cy="8" r="3.5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 20c0-3.5 3.13-6 7-6s7 2.5 7 6" />
+            </svg>
+          )}
         </div>
-        <div className="min-w-0">
-          <div className="font-extrabold text-lg">KaloriTakip Kullanıcısı</div>
-          <div className="text-xs text-muted mt-0.5">
-            {daysLeft > 0 ? `${daysLeft} gün ücretsiz erişim kaldı` : "Ücretsiz deneme bitti"}
+        <div className="min-w-0 flex-1">
+          <div className="font-extrabold text-lg truncate">
+            {user?.name || user?.email || "KaloriTakip Kullanıcısı"}
+          </div>
+          <div className="text-xs text-muted mt-0.5 truncate">
+            {user
+              ? user.email || "Danışan"
+              : daysLeft > 0
+                ? `${daysLeft} gün ücretsiz erişim kaldı`
+                : "Ücretsiz deneme bitti"}
           </div>
         </div>
+        {!user && (
+          <button
+            onClick={onLogin}
+            className="shrink-0 px-3.5 py-2 rounded-xl bg-accent text-foreground font-bold text-xs active:scale-95 transition-transform"
+          >
+            Giriş Yap
+          </button>
+        )}
       </div>
 
       {/* Quick stats */}
@@ -156,10 +196,22 @@ export default function ProfileView({
             </svg>
           }
         />
+        {user?.role === "client" && (
+          <MenuRow
+            onClick={() => setSection("connect")}
+            label="Eğitmene Bağlan"
+            sub="Davet kodu ile eğitmeninle eşleş"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-2.13a4 4 0 10-4-4 4 4 0 004 4z" />
+              </svg>
+            }
+          />
+        )}
       </div>
 
       {/* Settings */}
-      <div className="bg-card-bg rounded-3xl border border-border overflow-hidden">
+      <div className="bg-card-bg rounded-3xl border border-border overflow-hidden divide-y divide-border">
         <MenuRow
           onClick={() => setConfirmReset(true)}
           label="Bugünün verisini sıfırla"
@@ -171,6 +223,19 @@ export default function ProfileView({
             </svg>
           }
         />
+        {user && (
+          <MenuRow
+            onClick={() => signOut()}
+            label="Çıkış Yap"
+            sub={user.email || undefined}
+            danger
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            }
+          />
+        )}
       </div>
 
       <p className="text-center text-[11px] text-muted">
@@ -202,6 +267,71 @@ export default function ProfileView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Client-side form to redeem a trainer's invitation code.
+function ConnectTrainer() {
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed || status === "saving") return;
+    setStatus("saving");
+    setError(null);
+    try {
+      const res = await fetch("/api/invitations/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Bağlanılamadı");
+      setStatus("done");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bağlanılamadı");
+      setStatus("idle");
+    }
+  };
+
+  if (status === "done") {
+    return (
+      <div className="bg-surface rounded-3xl p-6 text-center">
+        <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-accent/40 flex items-center justify-center">
+          <svg className="w-7 h-7 text-accent-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h3 className="font-bold text-sm mb-1">Eğitmenine bağlandın</h3>
+        <p className="text-xs text-muted">Eğitmenin artık günlük kayıtlarını görebilir.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        Eğitmeninin paylaştığı davet kodunu gir. Kabul ettiğinde eğitmenin günlük kalori
+        ve öğün kayıtlarını (fotoğraflar dahil) görebilir.
+      </p>
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="DAVET KODU"
+        autoCapitalize="characters"
+        className="w-full bg-card-bg border border-border rounded-2xl px-4 py-3.5 text-center text-lg font-bold tracking-[0.2em] uppercase focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent-dark/30"
+      />
+      {error && <p className="text-sm text-danger text-center">{error}</p>}
+      <button
+        onClick={submit}
+        disabled={status === "saving" || !code.trim()}
+        className="w-full py-3.5 rounded-2xl bg-accent text-foreground font-bold text-sm active:scale-[0.98] transition-transform disabled:opacity-60"
+      >
+        {status === "saving" ? "Bağlanıyor..." : "Eğitmene Bağlan"}
+      </button>
     </div>
   );
 }
