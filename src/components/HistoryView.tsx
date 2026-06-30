@@ -92,7 +92,10 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
   });
 
   const max = Math.max(...week.map((d) => Math.max(d.totalCalories, d.target)), 1);
-  const targetLinePct = Math.min((fallbackTarget / max) * 100, 100);
+  // Scale bars to ~82% of the plot so the value label above the tallest bar
+  // still fits inside the card.
+  const SCALE = 82;
+  const targetLinePct = Math.min((fallbackTarget / max) * SCALE, SCALE);
 
   return (
     <div className="bg-card-bg rounded-3xl p-4 border border-border shadow-sm">
@@ -112,11 +115,16 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
           style={{ bottom: `${targetLinePct}%` }}
         />
         {week.map((d) => {
-          const pct = d.hasData ? Math.max((d.totalCalories / max) * 100, 4) : 0;
+          const pct = d.hasData ? Math.max((d.totalCalories / max) * SCALE, 5) : 0;
           const isOver = d.totalCalories > d.target;
           const isToday = d.date === today;
           return (
-            <div key={d.date} className="relative z-10 flex-1 h-full flex items-end">
+            <div key={d.date} className="relative z-10 flex-1 h-full flex flex-col items-center justify-end gap-1">
+              {d.hasData && (
+                <span className={`text-[8px] font-bold leading-none ${isOver ? "text-danger" : "text-foreground/70"}`}>
+                  {d.totalCalories}
+                </span>
+              )}
               <div
                 className={`w-full rounded-t-lg transition-all duration-500 ${
                   !d.hasData
@@ -127,7 +135,7 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
                         ? "bg-accent-strong"
                         : "bg-accent-dark"
                 }`}
-                style={{ height: `${Math.max(pct, d.hasData ? 4 : 2)}%` }}
+                style={{ height: `${Math.max(pct, d.hasData ? 5 : 2)}%` }}
               />
             </div>
           );
