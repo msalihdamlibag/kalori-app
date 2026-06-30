@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FoodItem } from "./FoodLog";
+import { CalorieIcon, ProteinIcon, CarbIcon, FatIcon } from "./MetricIcons";
 
 interface Meal {
   id: string;
@@ -46,13 +47,26 @@ function groupIntoMeals(items: FoodItem[]): Meal[] {
   return meals;
 }
 
-function MacroPill({ value, label }: { value: number; label: string }) {
+function MacroPill({
+  value,
+  label,
+  icon,
+  iconColor,
+}: {
+  value: number;
+  label: string;
+  icon: React.ReactNode;
+  iconColor: string;
+}) {
   return (
     <div className="flex gap-1.5">
       <div className="w-0.5 rounded-full bg-foreground" />
       <div>
         <div className="text-sm font-bold leading-none">{Math.round(value)} g</div>
-        <div className="text-[11px] text-muted">{label}</div>
+        <div className="text-[11px] text-muted flex items-center gap-1 mt-0.5">
+          <span className={iconColor}>{icon}</span>
+          {label}
+        </div>
       </div>
     </div>
   );
@@ -127,16 +141,17 @@ export default function TodayMeals({ items, onRemove }: TodayMealsProps) {
                   onClick={() => setExpanded(isExpanded ? null : meal.id)}
                   className="flex-1 min-w-0 text-left"
                 >
-                  <span className="inline-block text-sm font-bold text-accent-strong bg-accent/40 px-2.5 py-0.5 rounded-lg">
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-accent-strong bg-accent/40 px-2.5 py-0.5 rounded-lg">
+                    <CalorieIcon className="w-3.5 h-3.5" />
                     {meal.totalCalories} kcal
                   </span>
                   <h3 className="font-bold text-base mt-1.5 leading-snug truncate">
                     {meal.items.map((f) => f.name).join(", ")}
                   </h3>
                   <div className="flex items-stretch gap-3 mt-2">
-                    <MacroPill value={meal.totalProtein} label="Protein" />
-                    <MacroPill value={meal.totalFat} label="Yağ" />
-                    <MacroPill value={meal.totalCarbs} label="Karb." />
+                    <MacroPill value={meal.totalProtein} label="Protein" icon={<ProteinIcon className="w-3 h-3" />} iconColor="text-blue-500" />
+                    <MacroPill value={meal.totalFat} label="Yağ" icon={<FatIcon className="w-3 h-3" />} iconColor="text-rose-400" />
+                    <MacroPill value={meal.totalCarbs} label="Karb." icon={<CarbIcon className="w-3 h-3" />} iconColor="text-amber-500" />
                   </div>
                 </button>
 

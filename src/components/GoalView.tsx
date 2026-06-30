@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CalorieIcon, ProteinIcon, CarbIcon, FatIcon } from "./MetricIcons";
 
 export interface MacroTargets {
   protein: number;
@@ -64,12 +65,15 @@ function Stepper({
   );
 }
 
-function ProgressRow({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
+function ProgressRow({ label, value, target, color, icon, iconColor }: { label: string; value: number; target: number; color: string; icon?: React.ReactNode; iconColor?: string }) {
   const pct = target > 0 ? Math.min((value / target) * 100, 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="font-semibold">{label}</span>
+        <span className="font-semibold flex items-center gap-1.5">
+          {icon && <span className={iconColor}>{icon}</span>}
+          {label}
+        </span>
         <span className="text-muted">
           {Math.round(value)} / {target}
         </span>
@@ -116,10 +120,10 @@ export default function GoalView({
           <span className="text-sm text-muted">/ {target} kcal</span>
         </div>
         <div className="space-y-3">
-          <ProgressRow label="Kalori" value={consumed} target={target} color="bg-accent-dark" />
-          <ProgressRow label="Protein" value={protein} target={macroTargets.protein} color="bg-blue-500" />
-          <ProgressRow label="Yağ" value={fat} target={macroTargets.fat} color="bg-rose-400" />
-          <ProgressRow label="Karbonhidrat" value={carbs} target={macroTargets.carbs} color="bg-amber-500" />
+          <ProgressRow label="Kalori" value={consumed} target={target} color="bg-accent-dark" icon={<CalorieIcon className="w-3.5 h-3.5" />} iconColor="text-primary" />
+          <ProgressRow label="Protein" value={protein} target={macroTargets.protein} color="bg-blue-500" icon={<ProteinIcon className="w-3.5 h-3.5" />} iconColor="text-blue-500" />
+          <ProgressRow label="Yağ" value={fat} target={macroTargets.fat} color="bg-rose-400" icon={<FatIcon className="w-3.5 h-3.5" />} iconColor="text-rose-400" />
+          <ProgressRow label="Karbonhidrat" value={carbs} target={macroTargets.carbs} color="bg-amber-500" icon={<CarbIcon className="w-3.5 h-3.5" />} iconColor="text-amber-500" />
         </div>
       </div>
 
@@ -145,15 +149,15 @@ export default function GoalView({
         </div>
         <div className="space-y-4">
           <div>
-            <div className="text-xs font-semibold text-muted mb-2">Protein</div>
+            <div className="text-xs font-semibold text-muted mb-2 flex items-center gap-1.5"><ProteinIcon className="w-3.5 h-3.5 text-blue-500" />Protein</div>
             <Stepper value={macros.protein} onChange={(v) => setMacros((m) => ({ ...m, protein: v }))} step={5} suffix="g" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-muted mb-2">Yağ</div>
+            <div className="text-xs font-semibold text-muted mb-2 flex items-center gap-1.5"><FatIcon className="w-3.5 h-3.5 text-rose-400" />Yağ</div>
             <Stepper value={macros.fat} onChange={(v) => setMacros((m) => ({ ...m, fat: v }))} step={5} suffix="g" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-muted mb-2">Karbonhidrat</div>
+            <div className="text-xs font-semibold text-muted mb-2 flex items-center gap-1.5"><CarbIcon className="w-3.5 h-3.5 text-amber-500" />Karbonhidrat</div>
             <Stepper value={macros.carbs} onChange={(v) => setMacros((m) => ({ ...m, carbs: v }))} step={5} suffix="g" />
           </div>
         </div>
