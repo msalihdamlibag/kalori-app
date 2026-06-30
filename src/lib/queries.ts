@@ -114,7 +114,12 @@ export async function fetchHistory(params: {
         LIMIT ${limit} OFFSET ${offset}
       `;
 
-  const days: HistoryDay[] = [];
+  // A user may have more than one daily_logs row for the same date (e.g. logs
+  // synced from different devices and later claimed to the same account). Merge
+  // rows that share a date so history shows one entry per day: totals are
+  // summed, foods concatenated, and the largest target kept.
+  const byDate = new Map<string, HistoryDay>();
+  const order: string[] = [];
   for (const log of logs.rows) {
     const items = await sql`
       SELECT food_id, name, portion, calories, protein, carbs, fat, time, image_url
@@ -122,27 +127,41 @@ export async function fetchHistory(params: {
       WHERE daily_log_id = ${log.id}
       ORDER BY created_at ASC
     `;
-    days.push({
-      date: log.date,
-      target: log.target,
-      totalCalories: log.total_calories,
-      totalProtein: log.total_protein,
-      totalCarbs: log.total_carbs,
-      totalFat: log.total_fat,
-      foods: items.rows.map((item) => ({
-        id: item.food_id,
-        name: item.name,
-        portion: item.portion,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fat: item.fat,
-        time: item.time,
-        imageUrl: item.image_url,
-      })),
-    });
+    const foods = items.rows.map((item) => ({
+      id: item.food_id,
+      name: item.name,
+      portion: item.portion,
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
+      time: item.time,
+      imageUrl: item.image_url,
+    }));
+
+    const key = String(log.date);
+    const existing = byDate.get(key);
+    if (existing) {
+      existing.target = Math.max(existing.target, log.target);
+      existing.totalCalories += log.total_calories;
+      existing.totalProtein += log.total_protein;
+      existing.totalCarbs += log.total_carbs;
+      existing.totalFat += log.total_fat;
+      existing.foods.push(...foods);
+    } else {
+      byDate.set(key, {
+        date: log.date,
+        target: log.target,
+        totalCalories: log.total_calories,
+        totalProtein: log.total_protein,
+        totalCarbs: log.total_carbs,
+        totalFat: log.total_fat,
+        foods,
+      });
+      order.push(key);
+    }
   }
-  return days;
+  return order.map((d) => byDate.get(d)!);
 }
 
 // Does an active trainer<->client link exist between these two users?
