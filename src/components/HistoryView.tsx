@@ -70,8 +70,10 @@ function currentWeekMonToSun(): string[] {
 
 const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
-// Fixed Monday→Sunday calorie bars for the current week (days without a log
-// render as an empty column), with the target as a faint reference line.
+// Fixed Monday→Sunday calorie bar chart for the current week, built from the
+// loaded history. Days without a log render as a thin empty column; today's
+// bar is highlighted, over-target days are red, and a dashed line marks the
+// (most recent) calorie target.
 function WeeklyTrend({ days }: { days: HistoryDay[] }) {
   const byDate = new Map(days.map((d) => [String(d.date).slice(0, 10), d]));
   const fallbackTarget = days[0]?.target ?? 2000;
@@ -84,50 +86,66 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
       label: WEEKDAY_LABELS[i],
       totalCalories: d?.totalCalories ?? 0,
       target: d?.target ?? fallbackTarget,
+      hasData: !!d && d.totalCalories > 0,
       isFuture: date > today,
     };
   });
 
   const max = Math.max(...week.map((d) => Math.max(d.totalCalories, d.target)), 1);
+  const targetLinePct = Math.min((fallbackTarget / max) * 100, 100);
 
   return (
-    <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
-      <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Haftalık Trend</span>
-      <div className="mt-3 flex items-end justify-between gap-1.5 h-28">
+    <div className="bg-card-bg rounded-3xl p-4 border border-border shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-lg bg-accent/30 flex items-center justify-center">
+          <svg className="w-4 h-4 text-accent-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V11m5 5V7m5 9v-3M4 20h16" />
+          </svg>
+        </div>
+        <span className="text-[11px] font-bold text-muted uppercase tracking-wider">Haftalık Trend</span>
+      </div>
+
+      {/* Bars: container has an explicit height so % bar heights resolve. */}
+      <div className="relative h-32 flex items-end gap-1.5">
+        <div
+          className="absolute inset-x-0 border-t border-dashed border-muted/40 z-0"
+          style={{ bottom: `${targetLinePct}%` }}
+        />
         {week.map((d) => {
-          const h = Math.round((d.totalCalories / max) * 100);
-          const targetH = Math.round((d.target / max) * 100);
+          const pct = d.hasData ? Math.max((d.totalCalories / max) * 100, 4) : 0;
           const isOver = d.totalCalories > d.target;
           const isToday = d.date === today;
           return (
-            <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-              <div className="relative w-full flex-1 flex items-end">
-                {/* target reference line */}
-                <div
-                  className="absolute left-0 right-0 border-t border-dashed border-muted/40"
-                  style={{ bottom: `${targetH}%` }}
-                />
-                <div
-                  className={`w-full rounded-t-md transition-all ${
-                    d.isFuture
-                      ? "bg-border"
-                      : isOver
-                        ? "bg-danger"
+            <div key={d.date} className="relative z-10 flex-1 h-full flex items-end">
+              <div
+                className={`w-full rounded-t-lg transition-all duration-500 ${
+                  !d.hasData
+                    ? "bg-border/60"
+                    : isOver
+                      ? "bg-danger"
+                      : isToday
+                        ? "bg-accent-strong"
                         : "bg-accent-dark"
-                  }`}
-                  style={{ height: `${Math.max(h, 3)}%` }}
-                />
-              </div>
-              <span
-                className={`text-[9px] truncate w-full text-center ${
-                  isToday ? "font-bold text-foreground" : "text-muted"
                 }`}
-              >
-                {d.label}
-              </span>
+                style={{ height: `${Math.max(pct, d.hasData ? 4 : 2)}%` }}
+              />
             </div>
           );
         })}
+      </div>
+
+      {/* Weekday labels */}
+      <div className="flex gap-1.5 mt-2">
+        {week.map((d) => (
+          <span
+            key={d.date}
+            className={`flex-1 text-center text-[10px] ${
+              d.date === today ? "font-bold text-foreground" : "text-muted"
+            }`}
+          >
+            {d.label}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -317,27 +335,32 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
         )}
 
         {/* Weekly averages (directly under the daily summary) */}
-        <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
-          <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-            Son {last7.length} Gun Ortalamasi
-          </span>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            <div className="text-center">
-              <div className="text-lg font-bold text-primary">{avgCalories}</div>
-              <div className="text-[10px] text-muted">kcal</div>
+        <div className="bg-card-bg rounded-3xl p-4 border border-border shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 7-7M21 8V3m0 0h-5" />
+              </svg>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-blue-500">{avgProtein}g</div>
-              <div className="text-[10px] text-muted">protein</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-amber-500">{avgCarbs}g</div>
-              <div className="text-[10px] text-muted">karb</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-rose-400">{avgFat}g</div>
-              <div className="text-[10px] text-muted">yag</div>
-            </div>
+            <span className="text-[11px] font-bold text-muted uppercase tracking-wider">
+              Son {last7.length} Gün Ortalaması
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { v: `${avgCalories}`, label: "kcal", color: "text-primary", dot: "bg-primary" },
+              { v: `${avgProtein}g`, label: "protein", color: "text-blue-500", dot: "bg-blue-500" },
+              { v: `${avgCarbs}g`, label: "karb", color: "text-amber-500", dot: "bg-amber-500" },
+              { v: `${avgFat}g`, label: "yağ", color: "text-rose-400", dot: "bg-rose-400" },
+            ].map((m) => (
+              <div key={m.label} className="rounded-2xl bg-surface/60 py-2.5 text-center">
+                <div className={`text-lg font-extrabold ${m.color}`}>{m.v}</div>
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                  <span className="text-[10px] text-muted">{m.label}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -355,7 +378,7 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
             return (
               <div
                 key={day.date}
-                className="bg-card-bg rounded-2xl border border-border shadow-sm overflow-hidden animate-fade-in-up"
+                className="bg-card-bg rounded-3xl border border-border shadow-sm overflow-hidden animate-fade-in-up"
                 style={{ animationDelay: `${idx * 40}ms` }}
               >
                 {/* Photo strip preview (collapsed) */}
@@ -405,13 +428,24 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
                   onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                   className="w-full p-4 text-left"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold">{formatDate(day.date)}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-sm font-bold ${isOver ? "text-danger" : "text-primary"}`}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          isOver ? "bg-danger/10 text-danger" : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.9}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-bold truncate">{formatDate(day.date)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-sm font-extrabold ${isOver ? "text-danger" : "text-primary"}`}>
                         {day.totalCalories}
                       </span>
-                      <span className="text-[10px] text-muted">/ {day.target} kcal</span>
+                      <span className="text-[10px] text-muted">/ {day.target}</span>
                       <svg
                         className={`w-4 h-4 text-muted transition-transform duration-200 ml-1 ${isExpanded ? "rotate-180" : ""}`}
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -421,11 +455,16 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
                     </div>
                   </div>
                   <CalorieBar consumed={day.totalCalories} target={day.target} />
-                  <div className="flex gap-3 mt-2 text-[10px] text-muted">
-                    <span>P: {Math.round(day.totalProtein)}g</span>
-                    <span>K: {Math.round(day.totalCarbs)}g</span>
-                    <span>Y: {Math.round(day.totalFat)}g</span>
-                    <span className="ml-auto">{day.foods.length} kalem</span>
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-semibold">P {Math.round(day.totalProtein)}g</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-semibold">K {Math.round(day.totalCarbs)}g</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-semibold">Y {Math.round(day.totalFat)}g</span>
+                    <span className="ml-auto flex items-center gap-1 text-[10px] text-muted font-medium">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+                      </svg>
+                      {day.foods.length}
+                    </span>
                   </div>
                 </button>
 
