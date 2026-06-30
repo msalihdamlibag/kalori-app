@@ -9,6 +9,7 @@ import FreeAccessBanner from "@/components/FreeAccessBanner";
 import GoalView, { MacroTargets, macrosFromCalories } from "@/components/GoalView";
 import WorkoutView from "@/components/WorkoutView";
 import ProfileView from "@/components/ProfileView";
+import { savePhoto, getPhotos, deletePhotos } from "@/lib/photoStore";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
 const STORAGE_KEY_TARGET = "kalori-target";
@@ -157,7 +158,20 @@ export default function Home() {
       setFoods([]);
     } else {
       const saved = localStorage.getItem(STORAGE_KEY_FOODS);
-      if (saved) setFoods(JSON.parse(saved));
+      if (saved) {
+        const parsed: FoodItem[] = JSON.parse(saved);
+        setFoods(parsed);
+        // Re-attach on-device photos that were stripped from localStorage.
+        const missing = parsed.filter((f) => !f.imageUrl).map((f) => f.id);
+        if (missing.length) {
+          getPhotos(missing).then((local) => {
+            if (Object.keys(local).length === 0) return;
+            setFoods((prev) =>
+              prev.map((f) => (!f.imageUrl && local[f.id] ? { ...f, imageUrl: local[f.id] } : f))
+            );
+          });
+        }
+      }
     }
 
     const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
@@ -276,6 +290,12 @@ export default function Home() {
       imageUrl: photoUrl,
     }));
 
+    // Persist the photo on-device (keyed by food id) so it survives reloads and
+    // shows in history, even when there is no hosted Blob URL to store in the DB.
+    if (previewImage && (!photoUrl || photoUrl.startsWith("data:"))) {
+      await Promise.all(newItems.map((it) => savePhoto(it.id, previewImage)));
+    }
+
     setFoods((prev) => [...prev, ...newItems]);
     setPreviewImage(null);
     setAnalysisResult(null);
@@ -312,9 +332,15 @@ export default function Home() {
     setEditingItemIndex(null);
   };
 
-  const removeFood = (id: string) => setFoods((prev) => prev.filter((f) => f.id !== id));
+  const removeFood = (id: string) => {
+    setFoods((prev) => prev.filter((f) => f.id !== id));
+    deletePhotos([id]);
+  };
 
-  const resetToday = () => setFoods([]);
+  const resetToday = () => {
+    deletePhotos(foods.map((f) => f.id));
+    setFoods([]);
+  };
 
   const saveGoal = (newTarget: number, newMacros: MacroTargets) => {
     setTarget(newTarget);

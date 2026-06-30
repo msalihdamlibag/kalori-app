@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { getPhotos } from "@/lib/photoStore";
 
 interface HistoryFood {
   id: string;
@@ -73,7 +74,24 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.error || "Bilinmeyen hata");
 
-      const newDays = data.days || [];
+      const newDays: HistoryDay[] = data.days || [];
+
+      // Foods without a hosted image URL may still have an on-device photo
+      // (captured when Blob hosting was unavailable) — re-attach those.
+      const missingIds = newDays.flatMap((d) =>
+        d.foods.filter((f) => !f.imageUrl).map((f) => f.id)
+      );
+      if (missingIds.length) {
+        const local = await getPhotos(missingIds);
+        if (Object.keys(local).length) {
+          for (const d of newDays) {
+            for (const f of d.foods) {
+              if (!f.imageUrl && local[f.id]) f.imageUrl = local[f.id];
+            }
+          }
+        }
+      }
+
       if (offset === 0) {
         setDays(newDays);
       } else {

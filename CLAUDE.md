@@ -64,6 +64,12 @@ All app state is managed in `src/app/page.tsx` via `useState`. No state manageme
 - `kalori-date` — current date string (triggers reset on new day)
 - `kalori-register-date` — first-launch date, drives the 7-day free-access countdown
 
+Captured meal photos are persisted on-device in **IndexedDB** (`src/lib/photoStore.ts`,
+DB `kalori-photos`, keyed by food-item id). This lets photos survive reloads and appear in
+history even when Blob hosting is not configured (the DB stores only nutritional data, and
+base64 images are stripped before sync). `HistoryView` and the home loader re-attach these
+photos to any food whose `imageUrl` is missing.
+
 ### API Routes
 
 All three API routes follow the same pattern:
