@@ -42,6 +42,15 @@ export async function GET() {
       const users = await sql`SELECT COUNT(*)::int AS n FROM users`;
       result.canConnect = true;
       result.userCount = users.rows[0]?.n ?? 0;
+
+      // How many food items actually have a hosted photo URL? If this is 0, no
+      // photo ever reached Blob (so a trainer can't see any). If > 0 but a
+      // trainer sees none, the photos predate the linking or are on other days.
+      const photos = await sql`SELECT COUNT(*)::int AS n FROM food_items WHERE image_url IS NOT NULL`;
+      result.hostedPhotoCount = photos.rows[0]?.n ?? 0;
+      const sample = await sql`SELECT image_url FROM food_items WHERE image_url IS NOT NULL ORDER BY id DESC LIMIT 1`;
+      const lastUrl: string | undefined = sample.rows[0]?.image_url;
+      result.lastPhotoIsBlob = lastUrl ? lastUrl.includes("blob.vercel-storage.com") : null;
     } catch (e) {
       result.canConnect = false;
       result.dbError = e instanceof Error ? e.message : "unknown";
