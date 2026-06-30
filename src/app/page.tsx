@@ -9,7 +9,7 @@ import FreeAccessBanner from "@/components/FreeAccessBanner";
 import GoalView, { MacroTargets, macrosFromCalories } from "@/components/GoalView";
 import WorkoutView from "@/components/WorkoutView";
 import ProfileView from "@/components/ProfileView";
-import { savePhoto, getPhotos, deletePhotos } from "@/lib/photoStore";
+import { savePhoto, getPhotos, deletePhotos, prunePhotos } from "@/lib/photoStore";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
 const STORAGE_KEY_TARGET = "kalori-target";
@@ -17,8 +17,10 @@ const STORAGE_KEY_MACROS = "kalori-macros";
 const STORAGE_KEY_DATE = "kalori-date";
 const STORAGE_KEY_DEVICE = "kalori-device-id";
 const STORAGE_KEY_REGISTER = "kalori-register-date";
+const STORAGE_KEY_CLEANUP = "kalori-cleanup-date";
 
 const FREE_TRIAL_DAYS = 7;
+const PHOTO_RETENTION_DAYS = 7;
 
 function getTodayStr() {
   return new Date().toISOString().split("T")[0];
@@ -172,6 +174,21 @@ export default function Home() {
           });
         }
       }
+    }
+
+    // Enforce the photo retention window: prune on-device photos older than it,
+    // and ask the server (once per day) to drop hosted photos for older logs.
+    prunePhotos(PHOTO_RETENTION_DAYS * 86400000);
+    if (localStorage.getItem(STORAGE_KEY_CLEANUP) !== today) {
+      fetch("/api/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: id }),
+      })
+        .then((res) => {
+          if (res.ok) localStorage.setItem(STORAGE_KEY_CLEANUP, today);
+        })
+        .catch(() => {});
     }
 
     const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);

@@ -70,6 +70,12 @@ history even when Blob hosting is not configured (the DB stores only nutritional
 base64 images are stripped before sync). `HistoryView` and the home loader re-attach these
 photos to any food whose `imageUrl` is missing.
 
+Photos have a **7-day retention window** (`PHOTO_RETENTION_DAYS`). On app load the home page
+calls `prunePhotos()` to drop on-device photos older than 7 days, and once per day it POSTs
+to `/api/cleanup`, which nulls `image_url` and deletes the Blob files for food items in logs
+older than the cutoff (nutritional history itself is kept). `kalori-cleanup-date` guards the
+once-per-day server call.
+
 ### API Routes
 
 All three API routes follow the same pattern:
