@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
 import { ensureTables, isDbConfigured } from "@/lib/db";
+import { getBlobToken } from "@/lib/blob";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -21,9 +22,17 @@ export async function GET() {
     BLOB_READ_WRITE_TOKEN: !!process.env.BLOB_READ_WRITE_TOKEN,
   };
 
+  // The Blob token can be injected under a store-prefixed name; show which env
+  // keys look like a blob token (names only, never values) and whether we
+  // resolved one.
+  const blobEnvKeys = Object.keys(process.env).filter((k) => /BLOB/i.test(k));
+  const blobResolved = !!getBlobToken();
+
   const result: Record<string, unknown> = {
     dbConfigured: isDbConfigured(),
     envPresent,
+    blobEnvKeys,
+    blobResolved,
   };
 
   // Can we actually run a query and see our tables?

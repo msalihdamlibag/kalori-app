@@ -1,9 +1,11 @@
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { getBlobToken } from "@/lib/blob";
 
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const blobToken = getBlobToken();
+    if (!blobToken) {
       return NextResponse.json({ error: "Blob yapilandirilmamis" }, { status: 503 });
     }
 
@@ -23,6 +25,7 @@ export async function POST(req: NextRequest) {
     const blob = await put(name, buffer, {
       access: "public",
       contentType: mediaType,
+      token: blobToken,
     });
 
     return NextResponse.json({ url: blob.url });
