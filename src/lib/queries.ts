@@ -1,0 +1,289 @@
+import { sql } from "@vercel/postgres";
+
+// Shared data-access helpers used by the API routes. All callers must have
+// already verified isDbConfigured() and awaited ensureTables().
+
+export interface DbUser {
+  id: string;
+  provider: string;
+  email: string | null;
+  name: string | null;
+  image: string | null;
+  role: "client" | "trainer" | null;
+}
+
+// Insert or update a user by (provider, provider_account_id). Returns the row.
+// Profile fields are refreshed on every sign-in; `role` is preserved once set.
+export async function upsertUser(params: {
+  provider: string;
+  providerAccountId: string;
+  email?: string | null;
+  name?: string | null;
+  image?: string | null;
+}): Promise<DbUser> {
+  const { provider, providerAccountId, email, name, image } = params;
+  const res = await sql`
+    INSERT INTO users (provider, provider_account_id, email, name, image)
+    VALUES (${provider}, ${providerAccountId}, ${email ?? null}, ${name ?? null}, ${image ?? null})
+    ON CONFLICT (provider, provider_account_id)
+    DO UPDATE SET
+      email = COALESCE(EXCLUDED.email, users.email),
+      name = COALESCE(EXCLUDED.name, users.name),
+      image = COALESCE(EXCLUDED.image, users.image)
+    RETURNING id, provider, email, name, image, role
+  `;
+  return res.rows[0] as DbUser;
+}
+
+export async function getUserById(id: string): Promise<DbUser | null> {
+  const res = await sql`
+    SELECT id, provider, email, name, image, role FROM users WHERE id = ${id}
+  `;
+  return (res.rows[0] as DbUser) ?? null;
+}
+
+// Set a user's role exactly once. Returns the updated row, or null if the user
+// already has a role (in which case the existing role is left untouched).
+export async function setUserRole(
+  id: string,
+  role: "client" | "trainer"
+): Promise<DbUser | null> {
+  const res = await sql`
+    UPDATE users SET role = ${role}
+    WHERE id = ${id} AND role IS NULL
+    RETURNING id, provider, email, name, image, role
+  `;
+  return (res.rows[0] as DbUser) ?? null;
+}
+
+// Attach a device's anonymous daily logs to a user on first login. Only logs
+// that aren't already owned by someone are claimed.
+export async function claimDeviceLogs(
+  userId: string,
+  deviceId: string
+): Promise<number> {
+  const res = await sql`
+    UPDATE daily_logs SET user_id = ${userId}
+    WHERE device_id = ${deviceId} AND user_id IS NULL
+  `;
+  return res.rowCount ?? 0;
+}
+
+export interface HistoryDay {
+  date: string;
+  target: number;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  foods: {
+    id: string;
+    name: string;
+    portion: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    time: string;
+    imageUrl: string | null;
+  }[];
+}
+
+// Fetch daily logs (with food items) for either a user or an anonymous device.
+export async function fetchHistory(params: {
+  userId?: string | null;
+  deviceId?: string | null;
+  limit: number;
+  offset: number;
+}): Promise<HistoryDay[]> {
+  const { userId, deviceId, limit, offset } = params;
+
+  const logs = userId
+    ? await sql`
+        SELECT id, date, target, total_calories, total_protein, total_carbs, total_fat
+        FROM daily_logs
+        WHERE user_id = ${userId}
+        ORDER BY date DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `
+    : await sql`
+        SELECT id, date, target, total_calories, total_protein, total_carbs, total_fat
+        FROM daily_logs
+        WHERE device_id = ${deviceId} AND user_id IS NULL
+        ORDER BY date DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+  const days: HistoryDay[] = [];
+  for (const log of logs.rows) {
+    const items = await sql`
+      SELECT food_id, name, portion, calories, protein, carbs, fat, time, image_url
+      FROM food_items
+      WHERE daily_log_id = ${log.id}
+      ORDER BY created_at ASC
+    `;
+    days.push({
+      date: log.date,
+      target: log.target,
+      totalCalories: log.total_calories,
+      totalProtein: log.total_protein,
+      totalCarbs: log.total_carbs,
+      totalFat: log.total_fat,
+      foods: items.rows.map((item) => ({
+        id: item.food_id,
+        name: item.name,
+        portion: item.portion,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        time: item.time,
+        imageUrl: item.image_url,
+      })),
+    });
+  }
+  return days;
+}
+
+// Does an active trainer<->client link exist between these two users?
+export async function isTrainerOfClient(
+  trainerId: string,
+  clientId: string
+): Promise<boolean> {
+  const res = await sql`
+    SELECT 1 FROM trainer_clients
+    WHERE trainer_id = ${trainerId} AND client_id = ${clientId} AND status = 'active'
+    LIMIT 1
+  `;
+  return res.rows.length > 0;
+}
+
+// Short, human-typeable invitation code (no ambiguous chars).
+function makeCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+export interface Invitation {
+  id: string;
+  code: string;
+  status: string;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+// Create a fresh invitation for a trainer (valid for 14 days). Retries on the
+// astronomically unlikely code collision.
+export async function createInvitation(trainerId: string): Promise<Invitation> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = makeCode();
+    try {
+      const res = await sql`
+        INSERT INTO invitations (code, trainer_id, expires_at)
+        VALUES (${code}, ${trainerId}, NOW() + INTERVAL '14 days')
+        RETURNING id, code, status, expires_at, created_at
+      `;
+      const row = res.rows[0];
+      return {
+        id: row.id,
+        code: row.code,
+        status: row.status,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+      };
+    } catch {
+      // unique violation on code → try again
+    }
+  }
+  throw new Error("Davet kodu uretilemedi");
+}
+
+export async function listTrainerInvitations(trainerId: string): Promise<Invitation[]> {
+  const res = await sql`
+    SELECT id, code, status, expires_at, created_at
+    FROM invitations
+    WHERE trainer_id = ${trainerId} AND status = 'open' AND (expires_at IS NULL OR expires_at > NOW())
+    ORDER BY created_at DESC
+  `;
+  return res.rows.map((row) => ({
+    id: row.id,
+    code: row.code,
+    status: row.status,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  }));
+}
+
+// Redeem an invitation code as a client → creates the trainer_clients link.
+// Returns { ok, error? } so the route can map to a friendly status.
+export async function acceptInvitation(
+  code: string,
+  clientId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const inv = await sql`
+    SELECT id, trainer_id, status, expires_at
+    FROM invitations WHERE code = ${code}
+  `;
+  if (inv.rows.length === 0) return { ok: false, error: "Davet bulunamadi" };
+  const row = inv.rows[0];
+
+  if (row.status !== "open") return { ok: false, error: "Davet kullanilmis" };
+  if (row.expires_at && new Date(row.expires_at) < new Date()) {
+    return { ok: false, error: "Davet suresi dolmus" };
+  }
+  if (row.trainer_id === clientId) {
+    return { ok: false, error: "Kendi davetinizi kabul edemezsiniz" };
+  }
+
+  await sql`
+    INSERT INTO trainer_clients (trainer_id, client_id, status)
+    VALUES (${row.trainer_id}, ${clientId}, 'active')
+    ON CONFLICT (trainer_id, client_id) DO UPDATE SET status = 'active'
+  `;
+  await sql`
+    UPDATE invitations SET status = 'accepted', accepted_by = ${clientId}
+    WHERE id = ${row.id}
+  `;
+  return { ok: true };
+}
+
+export interface TrainerClient {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  linkedAt: string;
+  today: {
+    date: string;
+    target: number;
+    totalCalories: number;
+  } | null;
+}
+
+// List a trainer's active clients, each with today's summary (if logged).
+export async function listTrainerClients(trainerId: string): Promise<TrainerClient[]> {
+  const today = new Date().toISOString().split("T")[0];
+  const res = await sql`
+    SELECT u.id, u.name, u.email, u.image, tc.created_at AS linked_at,
+           dl.date, dl.target, dl.total_calories
+    FROM trainer_clients tc
+    JOIN users u ON u.id = tc.client_id
+    LEFT JOIN daily_logs dl ON dl.user_id = u.id AND dl.date = ${today}
+    WHERE tc.trainer_id = ${trainerId} AND tc.status = 'active'
+    ORDER BY u.name ASC NULLS LAST, u.email ASC
+  `;
+  return res.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    image: row.image,
+    linkedAt: row.linked_at,
+    today: row.date
+      ? { date: row.date, target: row.target, totalCalories: row.total_calories }
+      : null,
+  }));
+}

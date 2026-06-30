@@ -26,7 +26,11 @@ interface HistoryDay {
 }
 
 interface HistoryViewProps {
-  deviceId: string;
+  // Device-scoped history for the current user (anonymous or self). When the
+  // session is signed in, the server returns account-owned history regardless.
+  deviceId?: string;
+  // Trainer mode: read a linked client's history through the authorized endpoint.
+  clientId?: string;
 }
 
 function formatDate(dateStr: string) {
@@ -52,7 +56,7 @@ function CalorieBar({ consumed, target }: { consumed: number; target: number }) 
   );
 }
 
-export default function HistoryView({ deviceId }: HistoryViewProps) {
+export default function HistoryView({ deviceId, clientId }: HistoryViewProps) {
   const [days, setDays] = useState<HistoryDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +67,10 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
   const loadHistory = useCallback(async (offset = 0) => {
     try {
       setError(null);
-      const res = await fetch(`/api/history?deviceId=${deviceId}&limit=30&offset=${offset}`);
+      const url = clientId
+        ? `/api/trainer/clients/${clientId}/history?limit=30&offset=${offset}`
+        : `/api/history?deviceId=${deviceId ?? ""}&limit=30&offset=${offset}`;
+      const res = await fetch(url);
 
       if (res.status === 503) {
         setError("db_not_configured");
@@ -104,7 +111,7 @@ export default function HistoryView({ deviceId }: HistoryViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [deviceId]);
+  }, [deviceId, clientId]);
 
   useEffect(() => {
     loadHistory();

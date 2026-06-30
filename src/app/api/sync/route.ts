@@ -1,6 +1,9 @@
 import { sql } from "@vercel/postgres";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureTables, isDbConfigured } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth-helpers";
+
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,21 +22,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "deviceId ve date gerekli" }, { status: 400 });
     }
 
+    // When signed in, the log is owned by the user (so it follows the account
+    // and becomes visible to a linked trainer). Anonymous logs stay device-only.
+    const sessionUser = await getSessionUser();
+    const userId = sessionUser?.id ?? null;
+
     const totalCalories = (foods || []).reduce((s: number, f: { calories: number }) => s + f.calories, 0);
     const totalProtein = (foods || []).reduce((s: number, f: { protein: number }) => s + f.protein, 0);
     const totalCarbs = (foods || []).reduce((s: number, f: { carbs: number }) => s + f.carbs, 0);
     const totalFat = (foods || []).reduce((s: number, f: { fat: number }) => s + f.fat, 0);
 
     const logResult = await sql`
-      INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat)
-      VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat})
+      INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat, user_id)
+      VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat}, ${userId})
       ON CONFLICT (device_id, date)
       DO UPDATE SET
         target = EXCLUDED.target,
         total_calories = EXCLUDED.total_calories,
         total_protein = EXCLUDED.total_protein,
         total_carbs = EXCLUDED.total_carbs,
-        total_fat = EXCLUDED.total_fat
+        total_fat = EXCLUDED.total_fat,
+        user_id = COALESCE(daily_logs.user_id, EXCLUDED.user_id)
       RETURNING id
     `;
 
