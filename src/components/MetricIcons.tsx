@@ -1,53 +1,47 @@
 // Small, consistent icons for the four nutrition metrics, reused across every
-// card so calories/protein/carbs/fat always read the same way.
-//   calorie → flame, protein → egg, carbs → wheat, fat → droplet
+// card so calories/protein/carbs/fat always read the same way. We use real
+// emoji glyphs (rendered in full colour by the OS) for a friendlier, more
+// realistic look. They inherit the surrounding font-size, so the `className`
+// passed by callers (e.g. for layout) still works; sizing follows the text.
+//   calorie → 🔥, protein → 🥚, carbs → 🌾, fat → 💧
 
 interface IconProps {
   className?: string;
 }
 
-// Calorie — flame (filled)
-export function CalorieIcon({ className = "w-3.5 h-3.5" }: IconProps) {
+function Emoji({
+  char,
+  label,
+  className = "",
+}: {
+  char: string;
+  label: string;
+  className?: string;
+}) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12.7 2c.2 2.4-1.1 3.7-2.4 5C9 8.3 7.7 9.8 7.7 12c-.6-.5-1-1.3-1.2-2.4C4.9 11.1 4 13 4 14.8 4 18.8 7.6 22 12 22s8-3.2 8-7.2c0-4.7-3.7-6.8-4.9-10.5-.3-1-1.7-1.8-2.4-2.3z" />
-    </svg>
+    <span
+      className={`not-italic ${className ?? ""}`}
+      role="img"
+      aria-label={label}
+      style={{ fontSize: "0.95em", lineHeight: 1 }}
+    >
+      {char}
+    </span>
   );
 }
 
-// Protein — egg (filled)
-export function ProteinIcon({ className = "w-3.5 h-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2c3.2 0 6.5 5.6 6.5 10.2A6.5 6.5 0 0112 19a6.5 6.5 0 01-6.5-6.8C5.5 7.6 8.8 2 12 2z" />
-    </svg>
-  );
+export function CalorieIcon({ className }: IconProps) {
+  return <Emoji char="🔥" label="kalori" className={className} />;
 }
 
-// Carbs — wheat (stroke)
-export function CarbIcon({ className = "w-3.5 h-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 21V8" />
-      <path d="M12 9c-2-1-4.5-.7-4.5-.7s.2 2.5 1.6 3.4 2.9.4 2.9.4M12 9c2-1 4.5-.7 4.5-.7s-.2 2.5-1.6 3.4-2.9.4-2.9.4" />
-      <path d="M12 14c-2-1-4.5-.7-4.5-.7s.2 2.5 1.6 3.4 2.9.4 2.9.4M12 14c2-1 4.5-.7 4.5-.7s-.2 2.5-1.6 3.4-2.9.4-2.9.4" />
-    </svg>
-  );
+export function ProteinIcon({ className }: IconProps) {
+  return <Emoji char="🥚" label="protein" className={className} />;
 }
 
-// Fat — droplet (filled)
-export function FatIcon({ className = "w-3.5 h-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2.5S5.5 9.6 5.5 14.5a6.5 6.5 0 0013 0C18.5 9.6 12 2.5 12 2.5z" />
-    </svg>
-  );
+export function CarbIcon({ className }: IconProps) {
+  return <Emoji char="🌾" label="karbonhidrat" className={className} />;
 }
 
-// Shared colour convention for each metric.
-export const METRIC_COLORS = {
-  calorie: "text-primary",
-  protein: "text-blue-500",
-  carbs: "text-amber-500",
-  fat: "text-rose-400",
-} as const;
+export function FatIcon({ className }: IconProps) {
+  return <Emoji char="💧" label="yağ" className={className} />;
+}
