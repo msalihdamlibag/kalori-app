@@ -24,8 +24,12 @@ export default function RoleSelect() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Rol kaydedilemedi");
       }
-      // Refresh the JWT so session.user.role reflects the new value.
-      await update();
+      // Refresh the JWT so session.user.role reflects the new value. update()
+      // alone is unreliable on next-auth beta, so reload as a guarantee: on the
+      // fresh load the jwt callback repopulates the role from the DB and the app
+      // routes to the correct view.
+      await update().catch(() => {});
+      window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rol kaydedilemedi");
       setSaving(null);

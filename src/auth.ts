@@ -56,13 +56,21 @@ async function buildConfig(): Promise<NextAuthConfig> {
         }
         return true;
       },
-      async jwt({ token, user, trigger }) {
+      async jwt({ token, user }) {
         if (user?.id) {
           token.dbId = user.id;
           token.role = (user as { role?: string | null }).role ?? null;
         }
-        // After the client picks a role it calls update(); refresh from DB.
-        if (trigger === "update" && token.dbId && isDbConfigured()) {
+        // Refresh the role from the DB whenever it's still missing (covers the
+        // window between sign-in and picking a role). next-auth beta's update()
+        // doesn't reliably re-trigger this callback, so we don't gate on the
+        // "update" trigger — instead any session read repopulates the role.
+        // Once set, no further DB hits happen.
+        if (
+          token.dbId &&
+          (token.role === null || token.role === undefined) &&
+          isDbConfigured()
+        ) {
           try {
             await ensureTables();
             const u = await getUserById(token.dbId as string);
