@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 // Shown once, right after first sign-in, when the user has no role yet.
 // Picking a role is permanent (set server-side, then the session is refreshed).
@@ -24,8 +24,12 @@ export default function RoleSelect() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Rol kaydedilemedi");
       }
-      // Refresh the JWT so session.user.role reflects the new value.
-      await update();
+      // Refresh the JWT so session.user.role reflects the new value. update()
+      // alone is unreliable on next-auth beta, so reload as a guarantee: on the
+      // fresh load the jwt callback repopulates the role from the DB and the app
+      // routes to the correct view.
+      await update().catch(() => {});
+      window.location.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rol kaydedilemedi");
       setSaving(null);
@@ -83,6 +87,14 @@ export default function RoleSelect() {
       </div>
 
       {error && <p className="text-sm text-danger mt-5 text-center">{error}</p>}
+
+      <button
+        onClick={() => signOut()}
+        disabled={saving !== null}
+        className="mt-8 mx-auto block text-xs font-semibold text-muted underline disabled:opacity-60"
+      >
+        Farklı hesapla giriş yap
+      </button>
     </div>
   );
 }

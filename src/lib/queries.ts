@@ -10,6 +10,10 @@ export interface DbUser {
   name: string | null;
   image: string | null;
   role: "client" | "trainer" | null;
+  age?: number | null;
+  weight?: number | null;
+  height?: number | null;
+  gender?: string | null;
 }
 
 // Insert or update a user by (provider, provider_account_id). Returns the row.
@@ -37,7 +41,42 @@ export async function upsertUser(params: {
 
 export async function getUserById(id: string): Promise<DbUser | null> {
   const res = await sql`
-    SELECT id, provider, email, name, image, role FROM users WHERE id = ${id}
+    SELECT id, provider, email, name, image, role, age, weight, height, gender
+    FROM users WHERE id = ${id}
+  `;
+  return (res.rows[0] as DbUser) ?? null;
+}
+
+// Fallback lookup used to heal sessions whose token lost the DB id (e.g. cookies
+// minted before the DB was reachable). Picks the oldest row for the email.
+export async function getUserByEmail(email: string): Promise<DbUser | null> {
+  const res = await sql`
+    SELECT id, provider, email, name, image, role, age, weight, height, gender
+    FROM users
+    WHERE email = ${email}
+    ORDER BY created_at ASC
+    LIMIT 1
+  `;
+  return (res.rows[0] as DbUser) ?? null;
+}
+
+export interface ProfileFields {
+  age: number | null;
+  weight: number | null;
+  height: number | null;
+  gender: string | null;
+}
+
+// Update a user's optional profile fields (age/weight/height/gender).
+export async function updateUserProfile(id: string, p: ProfileFields): Promise<DbUser | null> {
+  const res = await sql`
+    UPDATE users SET
+      age = ${p.age},
+      weight = ${p.weight},
+      height = ${p.height},
+      gender = ${p.gender}
+    WHERE id = ${id}
+    RETURNING id, provider, email, name, image, role, age, weight, height, gender
   `;
   return (res.rows[0] as DbUser) ?? null;
 }
@@ -98,19 +137,24 @@ export async function fetchHistory(params: {
 }): Promise<HistoryDay[]> {
   const { userId, deviceId, limit, offset } = params;
 
+  // A user may have more than one daily_logs row for the same date (e.g. logs
+  // synced from different devices and later claimed to the same account, or
+  // legacy duplicates). DISTINCT ON keeps exactly one row per date — the
+  // "richest" one (highest total_calories) — so history shows a single,
+  // non-inflated entry per day and empty duplicates are ignored.
   const logs = userId
     ? await sql`
-        SELECT id, date, target, total_calories, total_protein, total_carbs, total_fat
+        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat
         FROM daily_logs
         WHERE user_id = ${userId}
-        ORDER BY date DESC
+        ORDER BY date DESC, total_calories DESC
         LIMIT ${limit} OFFSET ${offset}
       `
     : await sql`
-        SELECT id, date, target, total_calories, total_protein, total_carbs, total_fat
+        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat
         FROM daily_logs
         WHERE device_id = ${deviceId} AND user_id IS NULL
-        ORDER BY date DESC
+        ORDER BY date DESC, total_calories DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
 
@@ -256,6 +300,10 @@ export interface TrainerClient {
   name: string | null;
   email: string | null;
   image: string | null;
+  age: number | null;
+  weight: number | null;
+  height: number | null;
+  gender: string | null;
   linkedAt: string;
   today: {
     date: string;
@@ -265,14 +313,24 @@ export interface TrainerClient {
 }
 
 // List a trainer's active clients, each with today's summary (if logged).
+// Today's totals are aggregated per client in a subquery so a client with more
+// than one daily_logs row for today (legacy duplicates) appears exactly once.
 export async function listTrainerClients(trainerId: string): Promise<TrainerClient[]> {
   const today = new Date().toISOString().split("T")[0];
   const res = await sql`
-    SELECT u.id, u.name, u.email, u.image, tc.created_at AS linked_at,
-           dl.date, dl.target, dl.total_calories
+    SELECT u.id, u.name, u.email, u.image, u.age, u.weight, u.height, u.gender,
+           tc.created_at AS linked_at,
+           t.total_calories, t.target
     FROM trainer_clients tc
     JOIN users u ON u.id = tc.client_id
-    LEFT JOIN daily_logs dl ON dl.user_id = u.id AND dl.date = ${today}
+    LEFT JOIN (
+      SELECT user_id,
+             MAX(total_calories) AS total_calories,
+             MAX(target) AS target
+      FROM daily_logs
+      WHERE date = ${today} AND user_id IS NOT NULL
+      GROUP BY user_id
+    ) t ON t.user_id = u.id
     WHERE tc.trainer_id = ${trainerId} AND tc.status = 'active'
     ORDER BY u.name ASC NULLS LAST, u.email ASC
   `;
@@ -281,9 +339,14 @@ export async function listTrainerClients(trainerId: string): Promise<TrainerClie
     name: row.name,
     email: row.email,
     image: row.image,
+    age: row.age ?? null,
+    weight: row.weight ?? null,
+    height: row.height ?? null,
+    gender: row.gender ?? null,
     linkedAt: row.linked_at,
-    today: row.date
-      ? { date: row.date, target: row.target, totalCalories: row.total_calories }
-      : null,
+    today:
+      row.total_calories !== null && row.total_calories !== undefined
+        ? { date: today, target: row.target ?? 2000, totalCalories: row.total_calories }
+        : null,
   }));
 }

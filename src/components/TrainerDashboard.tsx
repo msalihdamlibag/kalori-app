@@ -9,8 +9,28 @@ interface TrainerClient {
   name: string | null;
   email: string | null;
   image: string | null;
+  age: number | null;
+  weight: number | null;
+  height: number | null;
+  gender: string | null;
   linkedAt: string;
   today: { date: string; target: number; totalCalories: number } | null;
+}
+
+const GENDER_LABEL: Record<string, string> = {
+  female: "Kadın",
+  male: "Erkek",
+  other: "Diğer",
+};
+
+// "32 yaş · 78 kg · 180 cm · Erkek" — only the parts that are filled in.
+function clientMeta(c: TrainerClient): string {
+  const parts: string[] = [];
+  if (c.age != null) parts.push(`${c.age} yaş`);
+  if (c.weight != null) parts.push(`${c.weight} kg`);
+  if (c.height != null) parts.push(`${c.height} cm`);
+  if (c.gender && GENDER_LABEL[c.gender]) parts.push(GENDER_LABEL[c.gender]);
+  return parts.join(" · ");
 }
 
 interface Invitation {
@@ -67,13 +87,23 @@ export default function TrainerDashboard() {
       <div className="flex flex-col min-h-screen max-w-md mx-auto w-full bg-background px-4 pt-5 pb-10">
         <div className="flex items-center gap-3 mb-4">
           <button
-            onClick={() => setSelected(null)}
+            onClick={() => { setSelected(null); loadClients(); }}
             className="w-9 h-9 rounded-xl bg-surface flex items-center justify-center active:scale-90 transition-transform"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
+          <div className="w-11 h-11 rounded-full bg-accent/40 flex items-center justify-center shrink-0 overflow-hidden">
+            {selected.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={selected.image} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-bold text-accent-strong">
+                {(selected.name || selected.email || "?").charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold truncate">
               {selected.name || selected.email || "Danışan"}
@@ -81,6 +111,17 @@ export default function TrainerDashboard() {
             {selected.email && <p className="text-xs text-muted truncate">{selected.email}</p>}
           </div>
         </div>
+
+        {clientMeta(selected) ? (
+          <div className="bg-surface rounded-2xl px-4 py-3 mb-4 text-sm font-semibold">
+            {clientMeta(selected)}
+          </div>
+        ) : (
+          <div className="bg-surface rounded-2xl px-4 py-3 mb-4 text-xs text-muted">
+            Danışan henüz yaş/kilo/boy bilgisi girmemiş.
+          </div>
+        )}
+
         <HistoryView clientId={selected.id} />
       </div>
     );
@@ -101,12 +142,23 @@ export default function TrainerDashboard() {
             <p className="text-xs text-muted">Eğitmen / Diyetisyen</p>
           </div>
         </div>
-        <button
-          onClick={() => signOut()}
-          className="text-xs font-semibold text-muted px-3 py-2 rounded-xl bg-surface active:scale-95 transition-transform"
-        >
-          Çıkış
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => { setLoading(true); loadClients(); }}
+            aria-label="Yenile"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface active:scale-95 transition-transform"
+          >
+            <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a7 7 0 0111.5-3.5L20 9M19 15a7 7 0 01-11.5 3.5L4 15" />
+            </svg>
+          </button>
+          <button
+            onClick={() => signOut()}
+            className="text-xs font-semibold text-muted px-3 py-2 rounded-xl bg-surface active:scale-95 transition-transform"
+          >
+            Çıkış
+          </button>
+        </div>
       </div>
 
       <button
@@ -157,6 +209,9 @@ export default function TrainerDashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm truncate">{c.name || c.email || "Danışan"}</div>
+                  {clientMeta(c) && (
+                    <div className="text-[11px] text-muted/80 truncate mt-0.5">{clientMeta(c)}</div>
+                  )}
                   <div className="text-xs text-muted mt-0.5">
                     {c.today
                       ? `Bugün: ${c.today.totalCalories} / ${c.today.target} kcal`

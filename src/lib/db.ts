@@ -2,7 +2,31 @@ import { sql } from "@vercel/postgres";
 
 let tablesCreated = false;
 
+// Different Vercel storage integrations expose the connection string under
+// different names: legacy Vercel Postgres uses POSTGRES_URL, the newer Neon
+// native integration uses DATABASE_URL. `@vercel/postgres` only reads
+// POSTGRES_URL, so we normalize whatever pooled URL exists into it. Prefer
+// pooled URLs (required by the serverless `sql` driver) over direct ones.
+function resolveConnectionString(): string | undefined {
+  return (
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    undefined
+  );
+}
+
+function ensureConnEnv() {
+  if (!process.env.POSTGRES_URL) {
+    const conn = resolveConnectionString();
+    if (conn) process.env.POSTGRES_URL = conn;
+  }
+}
+
 export async function ensureTables() {
+  ensureConnEnv();
   if (tablesCreated) return;
 
   try {
@@ -68,6 +92,13 @@ export async function ensureTables() {
       )
     `;
 
+    // Optional client profile fields (shown to a linked trainer). Filled in by
+    // the client from their profile screen.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS weight REAL`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS height REAL`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(16)`;
+
     // Daily logs were originally keyed only by device_id (anonymous). Logged-in
     // users own their logs through user_id; anonymous logs keep it NULL.
     await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id UUID`;
@@ -98,5 +129,6 @@ export async function ensureTables() {
 }
 
 export function isDbConfigured(): boolean {
-  return !!(process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING);
+  ensureConnEnv();
+  return !!process.env.POSTGRES_URL;
 }

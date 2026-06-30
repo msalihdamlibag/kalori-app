@@ -32,21 +32,51 @@ export async function POST(req: NextRequest) {
     const totalCarbs = (foods || []).reduce((s: number, f: { carbs: number }) => s + f.carbs, 0);
     const totalFat = (foods || []).reduce((s: number, f: { fat: number }) => s + f.fat, 0);
 
-    const logResult = await sql`
-      INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat, user_id)
-      VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat}, ${userId})
-      ON CONFLICT (device_id, date)
-      DO UPDATE SET
-        target = EXCLUDED.target,
-        total_calories = EXCLUDED.total_calories,
-        total_protein = EXCLUDED.total_protein,
-        total_carbs = EXCLUDED.total_carbs,
-        total_fat = EXCLUDED.total_fat,
-        user_id = COALESCE(daily_logs.user_id, EXCLUDED.user_id)
-      RETURNING id
-    `;
+    // For a signed-in user we keep a single row per (user_id, date) regardless
+    // of which device synced it — otherwise each device_id would create its own
+    // row for the same day and history (queried by user_id) would show
+    // duplicates. We also collapse any pre-existing duplicate rows for that day
+    // into the one we update, so the client's current data is the single source
+    // of truth (and a linked trainer sees exactly that). Anonymous logs stay
+    // keyed on (device_id, date).
+    let logId: number;
+    const existing = userId
+      ? await sql`SELECT id FROM daily_logs WHERE user_id = ${userId} AND date = ${date} ORDER BY id ASC`
+      : null;
 
-    const logId = logResult.rows[0].id;
+    if (existing && existing.rows.length > 0) {
+      logId = existing.rows[0].id;
+      // Remove any extra duplicate rows for this user/date (CASCADE drops their
+      // food_items) so only the row we're about to refresh remains.
+      if (existing.rows.length > 1) {
+        await sql`DELETE FROM daily_logs WHERE user_id = ${userId} AND date = ${date} AND id <> ${logId}`;
+      }
+      await sql`
+        UPDATE daily_logs SET
+          target = ${target || 2000},
+          total_calories = ${totalCalories},
+          total_protein = ${totalProtein},
+          total_carbs = ${totalCarbs},
+          total_fat = ${totalFat},
+          device_id = ${deviceId}
+        WHERE id = ${logId}
+      `;
+    } else {
+      const logResult = await sql`
+        INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat, user_id)
+        VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat}, ${userId})
+        ON CONFLICT (device_id, date)
+        DO UPDATE SET
+          target = EXCLUDED.target,
+          total_calories = EXCLUDED.total_calories,
+          total_protein = EXCLUDED.total_protein,
+          total_carbs = EXCLUDED.total_carbs,
+          total_fat = EXCLUDED.total_fat,
+          user_id = COALESCE(daily_logs.user_id, EXCLUDED.user_id)
+        RETURNING id
+      `;
+      logId = logResult.rows[0].id;
+    }
 
     await sql`DELETE FROM food_items WHERE daily_log_id = ${logId}`;
 
