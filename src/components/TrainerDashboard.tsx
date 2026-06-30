@@ -47,6 +47,8 @@ export default function TrainerDashboard() {
   const [selected, setSelected] = useState<TrainerClient | null>(null);
   const [invite, setInvite] = useState<Invitation | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const loadClients = useCallback(async () => {
     try {
@@ -78,6 +80,22 @@ export default function TrainerDashboard() {
       setError(e instanceof Error ? e.message : "Davet oluşturulamadı");
     } finally {
       setInviting(false);
+    }
+  };
+
+  const removeClient = async () => {
+    if (!selected || removing) return;
+    setRemoving(true);
+    try {
+      const res = await fetch(`/api/trainer/clients/${selected.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Kaldırılamadı");
+      setConfirmRemove(false);
+      setSelected(null);
+      await loadClients();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kaldırılamadı");
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -122,7 +140,41 @@ export default function TrainerDashboard() {
           </div>
         )}
 
-        <HistoryView clientId={selected.id} />
+        <HistoryView clientId={selected.id} showTodaySummary />
+
+        <button
+          onClick={() => setConfirmRemove(true)}
+          className="mt-6 w-full py-3 rounded-2xl border border-danger/30 text-danger font-semibold text-sm active:bg-danger/5 transition-colors"
+        >
+          Danışanı Kaldır
+        </button>
+
+        {confirmRemove && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-card-bg rounded-2xl p-6 w-full max-w-sm shadow-xl animate-scale-in">
+              <h2 className="font-bold text-lg mb-2">Danışanı kaldır?</h2>
+              <p className="text-sm text-muted mb-5">
+                {selected.name || selected.email || "Bu danışan"} listenden çıkacak ve kayıtlarına
+                erişimin sonlanacak. Danışan seni yeniden davet kabul ederek tekrar bağlanabilir.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmRemove(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-border font-semibold text-sm active:bg-surface transition-colors"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={removeClient}
+                  disabled={removing}
+                  className="flex-1 py-2.5 rounded-xl bg-danger text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-60"
+                >
+                  {removing ? "Kaldırılıyor..." : "Kaldır"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

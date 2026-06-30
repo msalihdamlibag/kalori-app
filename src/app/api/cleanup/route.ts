@@ -2,6 +2,7 @@ import { sql } from "@vercel/postgres";
 import { del } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureTables, isDbConfigured } from "@/lib/db";
+import { getBlobToken } from "@/lib/blob";
 
 // Photos are retained for this many days; older ones are removed from both the
 // Blob store and the database (nutritional history itself is kept).
@@ -47,15 +48,15 @@ async function cleanupOldPhotos(deviceId?: string) {
         `
       ).rows;
 
-  const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+  const blobToken = getBlobToken();
   let deleted = 0;
 
   for (const row of rows) {
     const url = row.image_url as string;
     // Remove the hosted file when it lives in our Blob store.
-    if (hasBlob && url.includes("blob.vercel-storage.com")) {
+    if (blobToken && url.includes("blob.vercel-storage.com")) {
       try {
-        await del(url);
+        await del(url, { token: blobToken });
       } catch (e) {
         console.warn("Blob silme hatasi:", e);
       }

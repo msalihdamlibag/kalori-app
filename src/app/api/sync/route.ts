@@ -16,11 +16,15 @@ export async function POST(req: NextRequest) {
 
     await ensureTables();
 
-    const { deviceId, date, target, foods } = await req.json();
+    const { deviceId, date, target, foods, macroTargets } = await req.json();
 
     if (!deviceId || !date) {
       return NextResponse.json({ error: "deviceId ve date gerekli" }, { status: 400 });
     }
+
+    const tProtein = macroTargets?.protein ?? null;
+    const tCarbs = macroTargets?.carbs ?? null;
+    const tFat = macroTargets?.fat ?? null;
 
     // When signed in, the log is owned by the user (so it follows the account
     // and becomes visible to a linked trainer). Anonymous logs stay device-only.
@@ -58,13 +62,16 @@ export async function POST(req: NextRequest) {
           total_protein = ${totalProtein},
           total_carbs = ${totalCarbs},
           total_fat = ${totalFat},
+          target_protein = ${tProtein},
+          target_carbs = ${tCarbs},
+          target_fat = ${tFat},
           device_id = ${deviceId}
         WHERE id = ${logId}
       `;
     } else {
       const logResult = await sql`
-        INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat, user_id)
-        VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat}, ${userId})
+        INSERT INTO daily_logs (device_id, date, target, total_calories, total_protein, total_carbs, total_fat, user_id, target_protein, target_carbs, target_fat)
+        VALUES (${deviceId}, ${date}, ${target || 2000}, ${totalCalories}, ${totalProtein}, ${totalCarbs}, ${totalFat}, ${userId}, ${tProtein}, ${tCarbs}, ${tFat})
         ON CONFLICT (device_id, date)
         DO UPDATE SET
           target = EXCLUDED.target,
@@ -72,6 +79,9 @@ export async function POST(req: NextRequest) {
           total_protein = EXCLUDED.total_protein,
           total_carbs = EXCLUDED.total_carbs,
           total_fat = EXCLUDED.total_fat,
+          target_protein = EXCLUDED.target_protein,
+          target_carbs = EXCLUDED.target_carbs,
+          target_fat = EXCLUDED.target_fat,
           user_id = COALESCE(daily_logs.user_id, EXCLUDED.user_id)
         RETURNING id
       `;

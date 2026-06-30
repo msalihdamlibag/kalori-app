@@ -104,6 +104,12 @@ export async function ensureTables() {
     await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id UUID`;
     await sql`CREATE INDEX IF NOT EXISTS idx_daily_logs_user_id ON daily_logs(user_id)`;
 
+    // Per-day macro targets, synced from the client so a trainer can see the
+    // client's goal vs intake. Null on older rows (fall back to derived values).
+    await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS target_protein REAL`;
+    await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS target_carbs REAL`;
+    await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS target_fat REAL`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS food_items (
         id SERIAL PRIMARY KEY,
