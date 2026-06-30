@@ -1,4 +1,5 @@
 import { sql } from "@vercel/postgres";
+import { localDateStr } from "@/lib/date";
 
 // Shared data-access helpers used by the API routes. All callers must have
 // already verified isDbConfigured() and awaited ensureTables().
@@ -340,7 +341,7 @@ export interface TrainerClient {
 // Today's totals are aggregated per client in a subquery so a client with more
 // than one daily_logs row for today (legacy duplicates) appears exactly once.
 export async function listTrainerClients(trainerId: string): Promise<TrainerClient[]> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const res = await sql`
     SELECT u.id, u.name, u.email, u.image, u.age, u.weight, u.height, u.gender,
            tc.created_at AS linked_at,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getPhotos } from "@/lib/photoStore";
+import { localDateStr } from "@/lib/date";
 import SummaryCard from "./SummaryCard";
 
 interface HistoryFood {
@@ -48,15 +49,20 @@ function deriveMacros(cal: number) {
 }
 
 function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  return localDateStr();
 }
 
 // Compact 7-day calorie bars with the target as a faint reference line.
-// The 7 dates (YYYY-MM-DD, UTC) of the current week, Monday → Sunday.
+// The 7 dates (YYYY-MM-DD) of the current week, Monday → Sunday, in app-local
+// time. We anchor on the local calendar date so the week matches the days the
+// user actually logged under.
 function currentWeekMonToSun(): string[] {
-  const now = new Date();
-  const sinceMon = (now.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
-  const monday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - sinceMon);
+  const [y, m, d] = todayStr().split("-").map(Number);
+  // Midnight UTC of today's local calendar date — used only to derive the
+  // weekday and step day-by-day; the emitted strings stay calendar dates.
+  const base = Date.UTC(y, m - 1, d);
+  const sinceMon = (new Date(base).getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  const monday = base - sinceMon * 86400000;
   return Array.from({ length: 7 }, (_, i) =>
     new Date(monday + i * 86400000).toISOString().slice(0, 10)
   );

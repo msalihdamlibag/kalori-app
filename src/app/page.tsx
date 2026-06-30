@@ -14,6 +14,7 @@ import RoleSelect from "@/components/RoleSelect";
 import TrainerDashboard from "@/components/TrainerDashboard";
 import LoginSheet from "@/components/LoginSheet";
 import { savePhoto, getPhotos, deletePhotos, prunePhotos } from "@/lib/photoStore";
+import { localDateStr } from "@/lib/date";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
 const STORAGE_KEY_TARGET = "kalori-target";
@@ -27,7 +28,7 @@ const FREE_TRIAL_DAYS = 7;
 const PHOTO_RETENTION_DAYS = 7;
 
 function getTodayStr() {
-  return new Date().toISOString().split("T")[0];
+  return localDateStr();
 }
 
 function getDeviceId(): string {
