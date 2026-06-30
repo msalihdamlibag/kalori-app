@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
 import RecipeSuggestions from "./RecipeSuggestions";
@@ -24,7 +24,7 @@ interface ProfileViewProps {
   onLogin: () => void;
 }
 
-type Section = "overview" | "history" | "recipes" | "connect";
+type Section = "overview" | "history" | "recipes" | "connect" | "info";
 
 function MenuRow({
   icon,
@@ -119,6 +119,15 @@ export default function ProfileView({
     );
   }
 
+  if (section === "info") {
+    return (
+      <div>
+        <SubHeader title="Bilgilerim" onBack={() => setSection("overview")} />
+        <MyInfo />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-extrabold">Profil</h1>
@@ -196,6 +205,18 @@ export default function ProfileView({
             </svg>
           }
         />
+        {user?.role === "client" && (
+          <MenuRow
+            onClick={() => setSection("info")}
+            label="Bilgilerim"
+            sub="Yaş, kilo, boy — eğitmenin görebilir"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            }
+          />
+        )}
         {user?.role === "client" && (
           <MenuRow
             onClick={() => setSection("connect")}
@@ -331,6 +352,132 @@ function ConnectTrainer() {
         className="w-full py-3.5 rounded-2xl bg-accent text-foreground font-bold text-sm active:scale-[0.98] transition-transform disabled:opacity-60"
       >
         {status === "saving" ? "Bağlanıyor..." : "Eğitmene Bağlan"}
+      </button>
+    </div>
+  );
+}
+
+// Client editable profile (age/weight/height/gender) shared with the trainer.
+function MyInfo() {
+  const [age, setAge] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
+  const [gender, setGender] = useState<"" | "male" | "female" | "other">("");
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) {
+          setAge(d.age != null ? String(d.age) : "");
+          setWeight(d.weight != null ? String(d.weight) : "");
+          setHeight(d.height != null ? String(d.height) : "");
+          setGender(d.gender ?? "");
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    if (status === "saving") return;
+    setStatus("saving");
+    setError(null);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          age: age === "" ? null : Number(age),
+          weight: weight === "" ? null : Number(weight),
+          height: height === "" ? null : Number(height),
+          gender: gender || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Kaydedilemedi");
+      setStatus("saved");
+      setTimeout(() => setStatus("idle"), 1800);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kaydedilemedi");
+      setStatus("idle");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-accent-strong border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const field = (
+    label: string,
+    value: string,
+    setValue: (v: string) => void,
+    suffix: string
+  ) => (
+    <div>
+      <label className="text-xs text-muted font-medium">{label}</label>
+      <div className="relative mt-1">
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-full bg-card-bg border border-border rounded-2xl px-4 py-3 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent-dark/30"
+        />
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">{suffix}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">
+        Bu bilgiler eğitmenin/diyetisyenin tarafından görülebilir. Boş bırakabilirsin.
+      </p>
+
+      <div className="grid grid-cols-3 gap-3">
+        {field("Yaş", age, setAge, "yıl")}
+        {field("Kilo", weight, setWeight, "kg")}
+        {field("Boy", height, setHeight, "cm")}
+      </div>
+
+      <div>
+        <label className="text-xs text-muted font-medium">Cinsiyet</label>
+        <div className="grid grid-cols-3 gap-2 mt-1">
+          {([
+            ["female", "Kadın"],
+            ["male", "Erkek"],
+            ["other", "Diğer"],
+          ] as const).map(([val, lbl]) => (
+            <button
+              key={val}
+              onClick={() => setGender(gender === val ? "" : val)}
+              className={`py-2.5 rounded-2xl text-sm font-semibold border transition-colors ${
+                gender === val
+                  ? "bg-accent border-accent-dark/30 text-foreground"
+                  : "bg-card-bg border-border text-muted"
+              }`}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-danger text-center">{error}</p>}
+
+      <button
+        onClick={save}
+        disabled={status === "saving"}
+        className="w-full py-3.5 rounded-2xl bg-accent text-foreground font-bold text-sm active:scale-[0.98] transition-transform disabled:opacity-60"
+      >
+        {status === "saving" ? "Kaydediliyor..." : status === "saved" ? "Kaydedildi ✓" : "Kaydet"}
       </button>
     </div>
   );

@@ -35,14 +35,22 @@ export async function POST(req: NextRequest) {
     // For a signed-in user we keep a single row per (user_id, date) regardless
     // of which device synced it — otherwise each device_id would create its own
     // row for the same day and history (queried by user_id) would show
-    // duplicates. Anonymous logs stay keyed on (device_id, date).
+    // duplicates. We also collapse any pre-existing duplicate rows for that day
+    // into the one we update, so the client's current data is the single source
+    // of truth (and a linked trainer sees exactly that). Anonymous logs stay
+    // keyed on (device_id, date).
     let logId: number;
     const existing = userId
-      ? await sql`SELECT id FROM daily_logs WHERE user_id = ${userId} AND date = ${date} ORDER BY id ASC LIMIT 1`
+      ? await sql`SELECT id FROM daily_logs WHERE user_id = ${userId} AND date = ${date} ORDER BY id ASC`
       : null;
 
     if (existing && existing.rows.length > 0) {
       logId = existing.rows[0].id;
+      // Remove any extra duplicate rows for this user/date (CASCADE drops their
+      // food_items) so only the row we're about to refresh remains.
+      if (existing.rows.length > 1) {
+        await sql`DELETE FROM daily_logs WHERE user_id = ${userId} AND date = ${date} AND id <> ${logId}`;
+      }
       await sql`
         UPDATE daily_logs SET
           target = ${target || 2000},

@@ -92,6 +92,13 @@ export async function ensureTables() {
       )
     `;
 
+    // Optional client profile fields (shown to a linked trainer). Filled in by
+    // the client from their profile screen.
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS weight REAL`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS height REAL`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(16)`;
+
     // Daily logs were originally keyed only by device_id (anonymous). Logged-in
     // users own their logs through user_id; anonymous logs keep it NULL.
     await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id UUID`;
