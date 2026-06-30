@@ -3,6 +3,7 @@ import { del } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureTables, isDbConfigured } from "@/lib/db";
 import { getBlobToken } from "@/lib/blob";
+import { localDateStr } from "@/lib/date";
 
 // Photos are retained for this many days; older ones are removed from both the
 // Blob store and the database (nutritional history itself is kept).
@@ -13,9 +14,7 @@ const RETENTION_DAYS = 7;
 async function cleanupOldPhotos(deviceId?: string) {
   await ensureTables();
 
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000)
-    .toISOString()
-    .split("T")[0];
+  const cutoff = localDateStr(new Date(Date.now() - RETENTION_DAYS * 86400000));
 
   // Keep photos for clients who are actively linked to a trainer, so the
   // trainer doesn't lose access to their meal photos after the retention window.
