@@ -115,6 +115,7 @@ export interface HistoryDay {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  macroTargets: { protein: number; carbs: number; fat: number } | null;
   foods: {
     id: string;
     name: string;
@@ -144,14 +145,16 @@ export async function fetchHistory(params: {
   // non-inflated entry per day and empty duplicates are ignored.
   const logs = userId
     ? await sql`
-        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat
+        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat,
+               target_protein, target_carbs, target_fat
         FROM daily_logs
         WHERE user_id = ${userId}
         ORDER BY date DESC, total_calories DESC
         LIMIT ${limit} OFFSET ${offset}
       `
     : await sql`
-        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat
+        SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat,
+               target_protein, target_carbs, target_fat
         FROM daily_logs
         WHERE device_id = ${deviceId} AND user_id IS NULL
         ORDER BY date DESC, total_calories DESC
@@ -173,6 +176,14 @@ export async function fetchHistory(params: {
       totalProtein: log.total_protein,
       totalCarbs: log.total_carbs,
       totalFat: log.total_fat,
+      macroTargets:
+        log.target_protein != null || log.target_carbs != null || log.target_fat != null
+          ? {
+              protein: log.target_protein ?? 0,
+              carbs: log.target_carbs ?? 0,
+              fat: log.target_fat ?? 0,
+            }
+          : null,
       foods: items.rows.map((item) => ({
         id: item.food_id,
         name: item.name,
@@ -187,6 +198,19 @@ export async function fetchHistory(params: {
     });
   }
   return days;
+}
+
+// Revoke a trainer<->client link (the client disappears from the trainer's
+// list and the trainer loses access to their data).
+export async function revokeTrainerClient(
+  trainerId: string,
+  clientId: string
+): Promise<boolean> {
+  const res = await sql`
+    UPDATE trainer_clients SET status = 'revoked'
+    WHERE trainer_id = ${trainerId} AND client_id = ${clientId} AND status = 'active'
+  `;
+  return (res.rowCount ?? 0) > 0;
 }
 
 // Does an active trainer<->client link exist between these two users?

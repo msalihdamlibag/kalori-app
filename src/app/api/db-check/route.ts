@@ -17,6 +17,8 @@ export async function GET() {
     AUTH_SECRET: !!process.env.AUTH_SECRET,
     AUTH_GOOGLE_ID: !!process.env.AUTH_GOOGLE_ID,
     AUTH_GOOGLE_SECRET: !!process.env.AUTH_GOOGLE_SECRET,
+    // Photos are only visible to a trainer when hosted in Blob (image_url).
+    BLOB_READ_WRITE_TOKEN: !!process.env.BLOB_READ_WRITE_TOKEN,
   };
 
   const result: Record<string, unknown> = {

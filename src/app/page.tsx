@@ -102,12 +102,18 @@ function stripInlineImages(foods: FoodItem[]): FoodItem[] {
   return foods.map((f) => (f.imageUrl?.startsWith("data:") ? { ...f, imageUrl: undefined } : f));
 }
 
-async function syncToDb(deviceId: string, date: string, target: number, foods: FoodItem[]) {
+async function syncToDb(
+  deviceId: string,
+  date: string,
+  target: number,
+  foods: FoodItem[],
+  macroTargets?: MacroTargets
+) {
   try {
     const res = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId, date, target, foods }),
+      body: JSON.stringify({ deviceId, date, target, foods, macroTargets }),
     });
     const data = await res.json();
     if (!res.ok) console.warn("Sync hatasi:", data.detail || data.error);
@@ -236,13 +242,13 @@ export default function Home() {
 
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
-      syncToDb(deviceId, getTodayStr(), target, stripInlineImages(foods));
+      syncToDb(deviceId, getTodayStr(), target, stripInlineImages(foods), macroTargets);
     }, 3000);
 
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
-  }, [foods, deviceId, target]);
+  }, [foods, deviceId, target, macroTargets]);
 
   // On first login, attach this device's anonymous logs to the account so the
   // user's existing history follows them (and becomes visible to a trainer).

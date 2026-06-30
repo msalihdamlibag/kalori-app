@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getPhotos } from "@/lib/photoStore";
+import SummaryCard from "./SummaryCard";
 
 interface HistoryFood {
   id: string;
@@ -22,6 +23,7 @@ interface HistoryDay {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  macroTargets?: { protein: number; carbs: number; fat: number } | null;
   foods: HistoryFood[];
 }
 
@@ -31,6 +33,59 @@ interface HistoryViewProps {
   deviceId?: string;
   // Trainer mode: read a linked client's history through the authorized endpoint.
   clientId?: string;
+  // Render a goal/macro summary card for today and a weekly trend chart at the
+  // top (used by the trainer's client detail).
+  showTodaySummary?: boolean;
+}
+
+// Fallback macro split (30/40/30 by calories) when targets weren't synced.
+function deriveMacros(cal: number) {
+  return {
+    protein: Math.round((cal * 0.3) / 4),
+    carbs: Math.round((cal * 0.4) / 4),
+    fat: Math.round((cal * 0.3) / 9),
+  };
+}
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
+// Compact 7-day calorie bars with the target as a faint reference line.
+function WeeklyTrend({ days }: { days: HistoryDay[] }) {
+  const last7 = days.slice(0, 7).slice().reverse();
+  if (last7.length === 0) return null;
+  const max = Math.max(...last7.map((d) => Math.max(d.totalCalories, d.target)), 1);
+
+  return (
+    <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
+      <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Haftalık Trend</span>
+      <div className="mt-3 flex items-end justify-between gap-1.5 h-28">
+        {last7.map((d) => {
+          const h = Math.round((d.totalCalories / max) * 100);
+          const targetH = Math.round((d.target / max) * 100);
+          const isOver = d.totalCalories > d.target;
+          const label = new Date(d.date).toLocaleDateString("tr-TR", { weekday: "short" });
+          return (
+            <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <div className="relative w-full flex-1 flex items-end">
+                {/* target reference line */}
+                <div
+                  className="absolute left-0 right-0 border-t border-dashed border-muted/40"
+                  style={{ bottom: `${targetH}%` }}
+                />
+                <div
+                  className={`w-full rounded-t-md transition-all ${isOver ? "bg-danger" : "bg-accent-dark"}`}
+                  style={{ height: `${Math.max(h, 3)}%` }}
+                />
+              </div>
+              <span className="text-[9px] text-muted truncate w-full text-center">{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function formatDate(dateStr: string) {
@@ -56,7 +111,7 @@ function CalorieBar({ consumed, target }: { consumed: number; target: number }) 
   );
 }
 
-export default function HistoryView({ deviceId, clientId }: HistoryViewProps) {
+export default function HistoryView({ deviceId, clientId, showTodaySummary }: HistoryViewProps) {
   const [days, setDays] = useState<HistoryDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +259,21 @@ export default function HistoryView({ deviceId, clientId }: HistoryViewProps) {
       )}
 
       <div className="space-y-4">
+        {/* Trainer view: today's goal/macro summary */}
+        {showTodaySummary && days[0]?.date && String(days[0].date).slice(0, 10) === todayStr() && (
+          <SummaryCard
+            consumed={days[0].totalCalories}
+            target={days[0].target}
+            protein={Math.round(days[0].totalProtein)}
+            carbs={Math.round(days[0].totalCarbs)}
+            fat={Math.round(days[0].totalFat)}
+            macroTargets={days[0].macroTargets ?? deriveMacros(days[0].target)}
+          />
+        )}
+
+        {/* Weekly trend chart */}
+        {showTodaySummary && <WeeklyTrend days={days} />}
+
         {/* Weekly averages */}
         <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
           <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
