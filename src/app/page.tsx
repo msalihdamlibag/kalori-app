@@ -15,6 +15,7 @@ import TrainerDashboard from "@/components/TrainerDashboard";
 import LoginSheet from "@/components/LoginSheet";
 import { savePhoto, getPhotos, deletePhotos, prunePhotos } from "@/lib/photoStore";
 import { localDateStr } from "@/lib/date";
+import { ProteinIcon, CarbIcon, FatIcon } from "@/components/MetricIcons";
 
 const STORAGE_KEY_FOODS = "kalori-foods";
 const STORAGE_KEY_TARGET = "kalori-target";
@@ -563,9 +564,9 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium">P {item.protein}g</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-medium">K {item.carbs}g</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium">Y {item.fat}g</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium inline-flex items-center gap-1"><ProteinIcon className="w-2.5 h-2.5" />{item.protein}g</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-medium inline-flex items-center gap-1"><CarbIcon className="w-2.5 h-2.5" />{item.carbs}g</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium inline-flex items-center gap-1"><FatIcon className="w-2.5 h-2.5" />{item.fat}g</span>
                         </div>
                       </button>
                     );

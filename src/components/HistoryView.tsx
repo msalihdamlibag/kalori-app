@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getPhotos } from "@/lib/photoStore";
 import { localDateStr } from "@/lib/date";
 import SummaryCard from "./SummaryCard";
+import { CalorieIcon, ProteinIcon, CarbIcon, FatIcon } from "./MetricIcons";
 
 interface HistoryFood {
   id: string;
@@ -356,15 +357,15 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
           </div>
           <div className="grid grid-cols-4 gap-2">
             {[
-              { v: `${avgCalories}`, label: "kcal", color: "text-primary", dot: "bg-primary" },
-              { v: `${avgProtein}g`, label: "protein", color: "text-blue-500", dot: "bg-blue-500" },
-              { v: `${avgCarbs}g`, label: "karb", color: "text-amber-500", dot: "bg-amber-500" },
-              { v: `${avgFat}g`, label: "yağ", color: "text-rose-400", dot: "bg-rose-400" },
+              { v: `${avgCalories}`, label: "kcal", color: "text-primary", icon: <CalorieIcon className="w-3 h-3" /> },
+              { v: `${avgProtein}g`, label: "protein", color: "text-blue-500", icon: <ProteinIcon className="w-3 h-3" /> },
+              { v: `${avgCarbs}g`, label: "karb", color: "text-amber-500", icon: <CarbIcon className="w-3 h-3" /> },
+              { v: `${avgFat}g`, label: "yağ", color: "text-rose-400", icon: <FatIcon className="w-3 h-3" /> },
             ].map((m) => (
               <div key={m.label} className="rounded-2xl bg-surface/60 py-2.5 text-center">
                 <div className={`text-lg font-extrabold ${m.color}`}>{m.v}</div>
                 <div className="flex items-center justify-center gap-1 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                  <span className={m.color}>{m.icon}</span>
                   <span className="text-[10px] text-muted">{m.label}</span>
                 </div>
               </div>
@@ -464,9 +465,9 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
                   </div>
                   <CalorieBar consumed={day.totalCalories} target={day.target} />
                   <div className="flex items-center gap-1.5 mt-2.5">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-semibold">P {Math.round(day.totalProtein)}g</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-semibold">K {Math.round(day.totalCarbs)}g</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-semibold">Y {Math.round(day.totalFat)}g</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-semibold inline-flex items-center gap-1"><ProteinIcon className="w-2.5 h-2.5" />{Math.round(day.totalProtein)}g</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-semibold inline-flex items-center gap-1"><CarbIcon className="w-2.5 h-2.5" />{Math.round(day.totalCarbs)}g</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-semibold inline-flex items-center gap-1"><FatIcon className="w-2.5 h-2.5" />{Math.round(day.totalFat)}g</span>
                     <span className="ml-auto flex items-center gap-1 text-[10px] text-muted font-medium">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h10" />
@@ -496,13 +497,13 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
                           <div className="text-sm font-semibold truncate">{food.name}</div>
                           <div className="text-xs text-muted mt-0.5">{food.portion}</div>
                           <div className="flex gap-2 mt-1.5">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium">P {food.protein}g</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-medium">K {food.carbs}g</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium">Y {food.fat}g</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 font-medium inline-flex items-center gap-1"><ProteinIcon className="w-2.5 h-2.5" />{food.protein}g</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 font-medium inline-flex items-center gap-1"><CarbIcon className="w-2.5 h-2.5" />{food.carbs}g</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-500 font-medium inline-flex items-center gap-1"><FatIcon className="w-2.5 h-2.5" />{food.fat}g</span>
                           </div>
                         </div>
                         <div className="shrink-0 ml-1 text-right">
-                          <span className="text-sm font-bold text-primary">{food.calories}</span>
+                          <span className="text-sm font-bold text-primary inline-flex items-center gap-1"><CalorieIcon className="w-3 h-3" />{food.calories}</span>
                           <div className="text-[10px] text-muted">{food.time}</div>
                         </div>
                       </div>

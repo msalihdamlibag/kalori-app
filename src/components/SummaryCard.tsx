@@ -1,5 +1,7 @@
 "use client";
 
+import { CalorieIcon, ProteinIcon, CarbIcon, FatIcon } from "./MetricIcons";
+
 interface MacroTargets {
   protein: number;
   carbs: number;
@@ -65,10 +67,14 @@ function MacroBar({
   label,
   value,
   target,
+  icon,
+  iconColor,
 }: {
   label: string;
   value: number;
   target: number;
+  icon: React.ReactNode;
+  iconColor: string;
 }) {
   const pct = target > 0 ? Math.min((value / target) * 100, 100) : 0;
   const isOver = value > target;
@@ -78,7 +84,10 @@ function MacroBar({
         <span className="text-2xl font-extrabold leading-none">{Math.round(value)}</span>
         <span className="text-xs text-muted font-medium">/{target}</span>
       </div>
-      <div className="text-sm font-semibold mt-1">{label}</div>
+      <div className="flex items-center gap-1 mt-1">
+        <span className={iconColor}>{icon}</span>
+        <span className="text-sm font-semibold">{label}</span>
+      </div>
       <div className="mt-1.5 h-1.5 rounded-full bg-border overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${isOver ? "bg-danger" : "bg-foreground"}`}
@@ -109,17 +118,23 @@ export default function SummaryCard({
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-1">
-          <span className="text-5xl font-extrabold tracking-tight">{consumed}</span>
-          <span className="text-sm text-muted font-medium">kcal</span>
+        <div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-5xl font-extrabold tracking-tight">{consumed}</span>
+            <span className="text-sm text-muted font-medium">kcal</span>
+          </div>
+          <div className="flex items-center gap-1 mt-1 text-primary">
+            <CalorieIcon className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold text-muted">tüketilen</span>
+          </div>
         </div>
         <GaugeRing consumed={consumed} target={target} />
       </div>
 
       <div className="flex gap-4 mt-2">
-        <MacroBar label="Protein" value={protein} target={macroTargets.protein} />
-        <MacroBar label="Yağ" value={fat} target={macroTargets.fat} />
-        <MacroBar label="Karb." value={carbs} target={macroTargets.carbs} />
+        <MacroBar label="Protein" value={protein} target={macroTargets.protein} icon={<ProteinIcon className="w-3.5 h-3.5" />} iconColor="text-blue-500" />
+        <MacroBar label="Yağ" value={fat} target={macroTargets.fat} icon={<FatIcon className="w-3.5 h-3.5" />} iconColor="text-rose-400" />
+        <MacroBar label="Karb." value={carbs} target={macroTargets.carbs} icon={<CarbIcon className="w-3.5 h-3.5" />} iconColor="text-amber-500" />
       </div>
     </div>
   );
