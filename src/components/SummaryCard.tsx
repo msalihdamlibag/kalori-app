@@ -105,7 +105,7 @@ export default function SummaryCard({
             <path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z" />
           </svg>
         </div>
-        <h2 className="text-xl font-extrabold">Özet</h2>
+        <h2 className="text-xl font-extrabold">Günlük Özet</h2>
       </div>
 
       <div className="flex items-center justify-between">
