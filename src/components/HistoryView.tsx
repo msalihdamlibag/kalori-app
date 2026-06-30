@@ -52,20 +52,47 @@ function todayStr() {
 }
 
 // Compact 7-day calorie bars with the target as a faint reference line.
+// The 7 dates (YYYY-MM-DD, UTC) of the current week, Monday → Sunday.
+function currentWeekMonToSun(): string[] {
+  const now = new Date();
+  const sinceMon = (now.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  const monday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - sinceMon);
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(monday + i * 86400000).toISOString().slice(0, 10)
+  );
+}
+
+const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+
+// Fixed Monday→Sunday calorie bars for the current week (days without a log
+// render as an empty column), with the target as a faint reference line.
 function WeeklyTrend({ days }: { days: HistoryDay[] }) {
-  const last7 = days.slice(0, 7).slice().reverse();
-  if (last7.length === 0) return null;
-  const max = Math.max(...last7.map((d) => Math.max(d.totalCalories, d.target)), 1);
+  const byDate = new Map(days.map((d) => [String(d.date).slice(0, 10), d]));
+  const fallbackTarget = days[0]?.target ?? 2000;
+  const today = todayStr();
+
+  const week = currentWeekMonToSun().map((date, i) => {
+    const d = byDate.get(date);
+    return {
+      date,
+      label: WEEKDAY_LABELS[i],
+      totalCalories: d?.totalCalories ?? 0,
+      target: d?.target ?? fallbackTarget,
+      isFuture: date > today,
+    };
+  });
+
+  const max = Math.max(...week.map((d) => Math.max(d.totalCalories, d.target)), 1);
 
   return (
     <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
       <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Haftalık Trend</span>
       <div className="mt-3 flex items-end justify-between gap-1.5 h-28">
-        {last7.map((d) => {
+        {week.map((d) => {
           const h = Math.round((d.totalCalories / max) * 100);
           const targetH = Math.round((d.target / max) * 100);
           const isOver = d.totalCalories > d.target;
-          const label = new Date(d.date).toLocaleDateString("tr-TR", { weekday: "short" });
+          const isToday = d.date === today;
           return (
             <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <div className="relative w-full flex-1 flex items-end">
@@ -75,11 +102,23 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
                   style={{ bottom: `${targetH}%` }}
                 />
                 <div
-                  className={`w-full rounded-t-md transition-all ${isOver ? "bg-danger" : "bg-accent-dark"}`}
+                  className={`w-full rounded-t-md transition-all ${
+                    d.isFuture
+                      ? "bg-border"
+                      : isOver
+                        ? "bg-danger"
+                        : "bg-accent-dark"
+                  }`}
                   style={{ height: `${Math.max(h, 3)}%` }}
                 />
               </div>
-              <span className="text-[9px] text-muted truncate w-full text-center">{label}</span>
+              <span
+                className={`text-[9px] truncate w-full text-center ${
+                  isToday ? "font-bold text-foreground" : "text-muted"
+                }`}
+              >
+                {d.label}
+              </span>
             </div>
           );
         })}
@@ -271,10 +310,7 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
           />
         )}
 
-        {/* Weekly trend chart */}
-        {showTodaySummary && <WeeklyTrend days={days} />}
-
-        {/* Weekly averages */}
+        {/* Weekly averages (directly under the daily summary) */}
         <div className="bg-card-bg rounded-2xl p-4 border border-border shadow-sm">
           <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
             Son {last7.length} Gun Ortalamasi
@@ -298,6 +334,9 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
             </div>
           </div>
         </div>
+
+        {/* Weekly trend chart (Mon → Sun) */}
+        {showTodaySummary && <WeeklyTrend days={days} />}
 
         {/* Day list */}
         <div className="space-y-2">
