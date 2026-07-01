@@ -52,10 +52,17 @@ async function cleanupOldPhotos(deviceId?: string) {
 
   for (const row of rows) {
     const url = row.image_url as string;
-    // Remove the hosted file when it lives in our Blob store.
-    if (blobToken && url.includes("blob.vercel-storage.com")) {
+    // Photos are stored privately and referenced via /api/photo/<pathname>;
+    // delete by pathname. (Legacy public blob.vercel-storage.com URLs, if any,
+    // are still handled by passing the URL straight to del.)
+    const target = url.startsWith("/api/photo/")
+      ? url.slice("/api/photo/".length)
+      : url.includes("blob.vercel-storage.com")
+        ? url
+        : null;
+    if (blobToken && target) {
       try {
-        await del(url, { token: blobToken });
+        await del(target, { token: blobToken });
       } catch (e) {
         console.warn("Blob silme hatasi:", e);
       }
