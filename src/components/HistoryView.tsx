@@ -190,13 +190,24 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  // Date-range filter (trainer client-detail only). null = all time.
+  const [rangeDays, setRangeDays] = useState<number | null>(30);
+  const showDateFilter = !!clientId;
 
   const loadHistory = useCallback(async (offset = 0) => {
     try {
       setError(null);
-      const url = clientId
-        ? `/api/trainer/clients/${clientId}/history?limit=30&offset=${offset}`
-        : `/api/history?deviceId=${deviceId ?? ""}&limit=30&offset=${offset}`;
+      let url: string;
+      if (clientId) {
+        const params = new URLSearchParams({ limit: "400", offset: String(offset) });
+        if (rangeDays) {
+          const from = localDateStr(new Date(Date.now() - (rangeDays - 1) * 86400000));
+          params.set("from", from);
+        }
+        url = `/api/trainer/clients/${clientId}/history?${params.toString()}`;
+      } else {
+        url = `/api/history?deviceId=${deviceId ?? ""}&limit=30&offset=${offset}`;
+      }
       const res = await fetch(url);
 
       if (res.status === 503) {
@@ -231,24 +242,52 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
       } else {
         setDays((prev) => [...prev, ...newDays]);
       }
-      setHasMore(newDays.length === 30);
+      // Trainer mode fetches the whole selected range at once (no paging).
+      setHasMore(!clientId && newDays.length === 30);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Bilinmeyen hata";
       setError(`Gecmis yuklenemedi: ${msg}`);
     } finally {
       setLoading(false);
     }
-  }, [deviceId, clientId]);
+  }, [deviceId, clientId, rangeDays]);
 
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
 
+  const rangeFilter = showDateFilter ? (
+    <div className="flex gap-2 mb-4">
+      {([
+        { l: "7 gün", v: 7 },
+        { l: "30 gün", v: 30 },
+        { l: "90 gün", v: 90 },
+        { l: "Tümü", v: null },
+      ] as { l: string; v: number | null }[]).map((opt) => (
+        <button
+          key={String(opt.v)}
+          onClick={() => {
+            setLoading(true);
+            setRangeDays(opt.v);
+          }}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors ${
+            rangeDays === opt.v ? "bg-accent text-foreground" : "bg-surface text-muted"
+          }`}
+        >
+          {opt.l}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center py-16 text-muted">
-        <div className="w-10 h-10 border-3 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-        <p className="text-sm font-medium">Gecmis yukleniyor...</p>
+      <div>
+        {rangeFilter}
+        <div className="flex flex-col items-center py-16 text-muted">
+          <div className="w-10 h-10 border-3 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
+          <p className="text-sm font-medium">Gecmis yukleniyor...</p>
+        </div>
       </div>
     );
   }
@@ -295,14 +334,17 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
 
   if (days.length === 0) {
     return (
-      <div className="text-center py-12 text-muted">
+      <div>
+        {rangeFilter}
+        <div className="text-center py-12 text-muted">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/5 flex items-center justify-center">
           <svg className="w-8 h-8 text-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <p className="font-medium text-foreground/60">Henuz gecmis kaydi yok</p>
-        <p className="text-sm mt-1">Gunluk verileriniz otomatik kaydedilecek</p>
+        <p className="font-medium text-foreground/60">Bu aralıkta kayıt yok</p>
+        <p className="text-sm mt-1">Farklı bir tarih aralığı seçebilirsin</p>
+        </div>
       </div>
     );
   }
@@ -331,6 +373,8 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
       )}
 
       <div className="space-y-4">
+        {rangeFilter}
+
         {/* Trainer view: today's goal/macro summary */}
         {showTodaySummary && days[0]?.date && String(days[0].date).slice(0, 10) === todayStr() && (
           <SummaryCard

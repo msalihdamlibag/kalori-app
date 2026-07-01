@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
 import RecipeSuggestions from "./RecipeSuggestions";
+import { pushSupported, isSubscribed, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 
 interface ProfileUser {
   name: string | null;
@@ -22,9 +23,10 @@ interface ProfileViewProps {
   onReset: () => void;
   user?: ProfileUser | null;
   onLogin: () => void;
+  onApplyTarget?: (target: number) => void;
 }
 
-type Section = "overview" | "history" | "recipes" | "connect" | "info";
+type Section = "overview" | "history" | "recipes" | "connect" | "info" | "notes";
 
 function MenuRow({
   icon,
@@ -88,6 +90,7 @@ export default function ProfileView({
   onReset,
   user,
   onLogin,
+  onApplyTarget,
 }: ProfileViewProps) {
   const [section, setSection] = useState<Section>("overview");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -124,6 +127,15 @@ export default function ProfileView({
       <div>
         <SubHeader title="Bilgilerim" onBack={() => setSection("overview")} />
         <MyInfo />
+      </div>
+    );
+  }
+
+  if (section === "notes") {
+    return (
+      <div>
+        <SubHeader title="Eğitmenimden Mesajlar" onBack={() => setSection("overview")} />
+        <ClientNotes onApplyTarget={onApplyTarget} />
       </div>
     );
   }
@@ -219,6 +231,18 @@ export default function ProfileView({
         )}
         {user?.role === "client" && (
           <MenuRow
+            onClick={() => setSection("notes")}
+            label="Eğitmenimden Mesajlar"
+            sub="Eğitmeninin notları ve hedef önerileri"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L4 21l1.8-5.5A8 8 0 1121 12z" />
+              </svg>
+            }
+          />
+        )}
+        {user?.role === "client" && (
+          <MenuRow
             onClick={() => setSection("connect")}
             label="Eğitmene Bağlan"
             sub="Davet kodu ile eğitmeninle eşleş"
@@ -230,6 +254,9 @@ export default function ProfileView({
           />
         )}
       </div>
+
+      {/* Notifications */}
+      <PushToggle deviceId={deviceId} />
 
       {/* Settings */}
       <div className="bg-card-bg rounded-3xl border border-border overflow-hidden divide-y divide-border">
@@ -479,6 +506,148 @@ function MyInfo() {
       >
         {status === "saving" ? "Kaydediliyor..." : status === "saved" ? "Kaydedildi ✓" : "Kaydet"}
       </button>
+    </div>
+  );
+}
+
+// Client's view of notes/messages from their trainer, with a one-tap "apply
+// suggested target" action.
+function ClientNotes({ onApplyTarget }: { onApplyTarget?: (target: number) => void }) {
+  const [notes, setNotes] = useState<
+    { id: string; body: string; suggestedTarget: number | null; createdAt: string; trainerName?: string | null }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [applied, setApplied] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/notes")
+      .then((r) => (r.ok ? r.json() : { notes: [] }))
+      .then((d) => setNotes(d.notes || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const formatWhen = (iso: string) =>
+    new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-accent-strong border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (notes.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted">
+        <p className="font-medium text-foreground/60">Henüz mesaj yok</p>
+        <p className="text-sm mt-1">Eğitmenin sana not gönderdiğinde burada görünür.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {notes.map((n) => (
+        <div key={n.id} className="bg-surface rounded-2xl p-4">
+          {n.trainerName && <div className="text-xs font-bold text-accent-strong mb-1">{n.trainerName}</div>}
+          <p className="text-sm whitespace-pre-wrap">{n.body}</p>
+          {n.suggestedTarget != null && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs font-semibold">Önerilen hedef: {n.suggestedTarget} kcal</span>
+              {onApplyTarget && (
+                <button
+                  onClick={() => {
+                    onApplyTarget(n.suggestedTarget!);
+                    setApplied(n.suggestedTarget!);
+                  }}
+                  className="ml-auto text-xs font-bold px-3 py-1.5 rounded-xl bg-accent text-foreground active:scale-95 transition-transform"
+                >
+                  {applied === n.suggestedTarget ? "Uygulandı ✓" : "Uygula"}
+                </button>
+              )}
+            </div>
+          )}
+          <div className="text-[10px] text-muted mt-2">{formatWhen(n.createdAt)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Toggle for daily reminder push notifications.
+function PushToggle({ deviceId }: { deviceId: string }) {
+  const [supported, setSupported] = useState(false);
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ok = pushSupported();
+    setSupported(ok);
+    if (ok) isSubscribed().then(setOn);
+  }, []);
+
+  if (!supported) {
+    return (
+      <div className="bg-card-bg rounded-3xl border border-border p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center shrink-0 text-muted">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">Günlük Hatırlatma</div>
+            <div className="text-xs text-muted mt-0.5">
+              Bildirimler için uygulamayı ana ekrana ekle (iOS) veya destekleyen bir tarayıcı kullan.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const toggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    if (on) {
+      await unsubscribeFromPush();
+      setOn(false);
+    } else {
+      const res = await subscribeToPush(deviceId);
+      if (res.ok) setOn(true);
+      else setMsg(res.error || "Açılamadı");
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="bg-card-bg rounded-3xl border border-border p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent/30 text-accent-strong flex items-center justify-center shrink-0">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm">Günlük Hatırlatma</div>
+          <div className="text-xs text-muted mt-0.5">Her akşam öğün eklemeyi hatırlat</div>
+          {msg && <div className="text-xs text-danger mt-0.5">{msg}</div>}
+        </div>
+        <button
+          onClick={toggle}
+          disabled={busy}
+          aria-label="Günlük hatırlatmayı aç/kapat"
+          className={`relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-60 ${on ? "bg-accent-dark" : "bg-border"}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : ""}`}
+          />
+        </button>
+      </div>
     </div>
   );
 }

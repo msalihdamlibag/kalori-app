@@ -65,6 +65,21 @@ export async function ensureTables() {
     // --- Invitations -----------------------------------------------------
     // A trainer mints an invitation carrying a short `code` (embedded in a QR
     // and typeable by hand). A client redeems it to form a trainer_clients link.
+    // --- Trainer notes / messages to a client -----------------------------
+    // One-way trainer → client notes. `suggested_target` is an optional daily
+    // calorie suggestion the client can apply with one tap.
+    await sql`
+      CREATE TABLE IF NOT EXISTS trainer_notes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trainer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        client_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        suggested_target INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_trainer_notes_client ON trainer_notes(client_id)`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS invitations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,6 +88,20 @@ export async function ensureTables() {
         status VARCHAR(16) NOT NULL DEFAULT 'open',
         accepted_by UUID REFERENCES users(id) ON DELETE SET NULL,
         expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    // --- Web push subscriptions -------------------------------------------
+    // One row per browser/device push endpoint (linked to a user when signed in).
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        device_id VARCHAR(64),
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;

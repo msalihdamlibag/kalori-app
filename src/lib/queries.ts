@@ -131,25 +131,30 @@ export interface HistoryDay {
 }
 
 // Fetch daily logs (with food items) for either a user or an anonymous device.
+// Optional `from`/`to` (YYYY-MM-DD, inclusive) restrict the date range.
 export async function fetchHistory(params: {
   userId?: string | null;
   deviceId?: string | null;
   limit: number;
   offset: number;
+  from?: string | null;
+  to?: string | null;
 }): Promise<HistoryDay[]> {
-  const { userId, deviceId, limit, offset } = params;
+  const { userId, deviceId, limit, offset, from, to } = params;
+  const fromV = from ?? "0001-01-01";
+  const toV = to ?? "9999-12-31";
 
   // A user may have more than one daily_logs row for the same date (e.g. logs
   // synced from different devices and later claimed to the same account, or
   // legacy duplicates). DISTINCT ON keeps exactly one row per date — the
   // "richest" one (highest total_calories) — so history shows a single,
-  // non-inflated entry per day and empty duplicates are ignored.
+  // non-inflated entry per date and empty duplicates are ignored.
   const logs = userId
     ? await sql`
         SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat,
                target_protein, target_carbs, target_fat
         FROM daily_logs
-        WHERE user_id = ${userId}
+        WHERE user_id = ${userId} AND date >= ${fromV} AND date <= ${toV}
         ORDER BY date DESC, total_calories DESC
         LIMIT ${limit} OFFSET ${offset}
       `
@@ -157,7 +162,7 @@ export async function fetchHistory(params: {
         SELECT DISTINCT ON (date) id, date, target, total_calories, total_protein, total_carbs, total_fat,
                target_protein, target_carbs, target_fat
         FROM daily_logs
-        WHERE device_id = ${deviceId} AND user_id IS NULL
+        WHERE device_id = ${deviceId} AND user_id IS NULL AND date >= ${fromV} AND date <= ${toV}
         ORDER BY date DESC, total_calories DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -199,6 +204,103 @@ export async function fetchHistory(params: {
     });
   }
   return days;
+}
+
+export interface PushSub {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+export async function upsertPushSubscription(params: {
+  userId: string | null;
+  deviceId: string | null;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): Promise<void> {
+  const { userId, deviceId, endpoint, p256dh, auth } = params;
+  await sql`
+    INSERT INTO push_subscriptions (user_id, device_id, endpoint, p256dh, auth)
+    VALUES (${userId}, ${deviceId}, ${endpoint}, ${p256dh}, ${auth})
+    ON CONFLICT (endpoint) DO UPDATE SET
+      user_id = EXCLUDED.user_id,
+      device_id = EXCLUDED.device_id,
+      p256dh = EXCLUDED.p256dh,
+      auth = EXCLUDED.auth
+  `;
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await sql`DELETE FROM push_subscriptions WHERE endpoint = ${endpoint}`;
+}
+
+export async function listPushSubscriptions(): Promise<PushSub[]> {
+  const res = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
+  return res.rows.map((r) => ({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }));
+}
+
+export interface TrainerNote {
+  id: string;
+  body: string;
+  suggestedTarget: number | null;
+  createdAt: string;
+  trainerName?: string | null;
+}
+
+export async function createTrainerNote(
+  trainerId: string,
+  clientId: string,
+  body: string,
+  suggestedTarget: number | null
+): Promise<TrainerNote> {
+  const res = await sql`
+    INSERT INTO trainer_notes (trainer_id, client_id, body, suggested_target)
+    VALUES (${trainerId}, ${clientId}, ${body}, ${suggestedTarget})
+    RETURNING id, body, suggested_target, created_at
+  `;
+  const r = res.rows[0];
+  return { id: r.id, body: r.body, suggestedTarget: r.suggested_target, createdAt: r.created_at };
+}
+
+// Notes for a client (most recent first). trainerName is included so the client
+// sees who wrote it.
+export async function listNotesForClient(clientId: string): Promise<TrainerNote[]> {
+  const res = await sql`
+    SELECT n.id, n.body, n.suggested_target, n.created_at, u.name AS trainer_name
+    FROM trainer_notes n
+    JOIN users u ON u.id = n.trainer_id
+    WHERE n.client_id = ${clientId}
+    ORDER BY n.created_at DESC
+    LIMIT 100
+  `;
+  return res.rows.map((r) => ({
+    id: r.id,
+    body: r.body,
+    suggestedTarget: r.suggested_target,
+    createdAt: r.created_at,
+    trainerName: r.trainer_name,
+  }));
+}
+
+// Notes a specific trainer wrote for a specific client.
+export async function listNotesByTrainerForClient(
+  trainerId: string,
+  clientId: string
+): Promise<TrainerNote[]> {
+  const res = await sql`
+    SELECT id, body, suggested_target, created_at
+    FROM trainer_notes
+    WHERE trainer_id = ${trainerId} AND client_id = ${clientId}
+    ORDER BY created_at DESC
+    LIMIT 100
+  `;
+  return res.rows.map((r) => ({
+    id: r.id,
+    body: r.body,
+    suggestedTarget: r.suggested_target,
+    createdAt: r.created_at,
+  }));
 }
 
 // Revoke a trainer<->client link (the client disappears from the trainer's

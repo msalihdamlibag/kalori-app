@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
+import TrainerClientNotes from "./TrainerClientNotes";
 
 interface TrainerClient {
   id: string;
@@ -139,6 +140,10 @@ export default function TrainerDashboard() {
             Danışan henüz yaş/kilo/boy bilgisi girmemiş.
           </div>
         )}
+
+        <div className="mb-4">
+          <TrainerClientNotes clientId={selected.id} />
+        </div>
 
         <HistoryView clientId={selected.id} showTodaySummary />
 
