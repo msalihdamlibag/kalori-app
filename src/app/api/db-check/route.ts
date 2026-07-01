@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
+import { put, del } from "@vercel/blob";
 import { ensureTables, isDbConfigured } from "@/lib/db";
 import { getBlobToken } from "@/lib/blob";
 import { auth } from "@/auth";
@@ -55,6 +56,31 @@ export async function GET() {
       result.canConnect = false;
       result.dbError = e instanceof Error ? e.message : "unknown";
     }
+  }
+
+  // Prove whether the server can actually WRITE to Blob with the current token
+  // (a valid token for the wrong store still fails here). Writes and deletes a
+  // tiny throwaway file.
+  const blobToken = getBlobToken();
+  if (blobToken) {
+    try {
+      const b = await put(`diag/dbcheck-${Date.now()}.txt`, "ok", {
+        access: "public",
+        contentType: "text/plain",
+        token: blobToken,
+        addRandomSuffix: true,
+      });
+      result.blobWrite = { ok: true, host: new URL(b.url).host };
+      try {
+        await del(b.url, { token: blobToken });
+      } catch {
+        /* harmless if the tiny file lingers */
+      }
+    } catch (e) {
+      result.blobWrite = { ok: false, error: e instanceof Error ? e.message : "unknown" };
+    }
+  } else {
+    result.blobWrite = { ok: false, reason: "no_token" };
   }
 
   // Is the caller signed in, and does the session carry a role yet?
