@@ -15,7 +15,7 @@ export async function GET() {
   }
   try {
     const blob = await put(`diag/test-${Date.now()}.txt`, "ok", {
-      access: "public",
+      access: "private",
       contentType: "text/plain",
       token,
       addRandomSuffix: true,

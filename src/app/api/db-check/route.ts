@@ -65,7 +65,7 @@ export async function GET() {
   if (blobToken) {
     try {
       const b = await put(`diag/dbcheck-${Date.now()}.txt`, "ok", {
-        access: "public",
+        access: "private",
         contentType: "text/plain",
         token: blobToken,
         addRandomSuffix: true,
