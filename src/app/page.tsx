@@ -662,6 +662,7 @@ export default function Home() {
                 : null
             }
             onLogin={() => setLoginOpen(true)}
+            onApplyTarget={(t) => saveGoal(t, macrosFromCalories(t))}
           />
         )}
       </main>

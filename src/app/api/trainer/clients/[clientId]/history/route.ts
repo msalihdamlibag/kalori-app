@@ -31,9 +31,11 @@ export async function GET(
   }
 
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "30"), 1), 90);
+  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "30"), 1), 366);
   const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
 
-  const days = await fetchHistory({ userId: clientId, limit, offset });
+  const days = await fetchHistory({ userId: clientId, limit, offset, from, to });
   return NextResponse.json({ days });
 }
