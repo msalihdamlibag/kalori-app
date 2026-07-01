@@ -24,6 +24,8 @@ interface ProfileViewProps {
   user?: ProfileUser | null;
   onLogin: () => void;
   onApplyTarget?: (target: number) => void;
+  unreadNotes?: number;
+  onNotesSeen?: () => void;
 }
 
 type Section = "overview" | "history" | "recipes" | "connect" | "info" | "notes";
@@ -34,12 +36,14 @@ function MenuRow({
   sub,
   onClick,
   danger,
+  badge,
 }: {
   icon: React.ReactNode;
   label: string;
   sub?: string;
   onClick: () => void;
   danger?: boolean;
+  badge?: number;
 }) {
   return (
     <button
@@ -47,11 +51,16 @@ function MenuRow({
       className="w-full flex items-center gap-3 p-4 active:bg-surface transition-colors text-left"
     >
       <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+        className={`relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
           danger ? "bg-danger/10 text-danger" : "bg-accent/30 text-accent-strong"
         }`}
       >
         {icon}
+        {!!badge && badge > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-card-bg">
+            {badge > 9 ? "9+" : badge}
+          </span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className={`font-semibold text-sm ${danger ? "text-danger" : ""}`}>{label}</div>
@@ -91,9 +100,16 @@ export default function ProfileView({
   user,
   onLogin,
   onApplyTarget,
+  unreadNotes = 0,
+  onNotesSeen,
 }: ProfileViewProps) {
   const [section, setSection] = useState<Section>("overview");
   const [confirmReset, setConfirmReset] = useState(false);
+
+  const openNotes = () => {
+    setSection("notes");
+    onNotesSeen?.();
+  };
 
   if (section === "history") {
     return (
@@ -231,9 +247,10 @@ export default function ProfileView({
         )}
         {user?.role === "client" && (
           <MenuRow
-            onClick={() => setSection("notes")}
+            onClick={openNotes}
             label="Eğitmenimden Mesajlar"
             sub="Eğitmeninin notları ve hedef önerileri"
+            badge={unreadNotes}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L4 21l1.8-5.5A8 8 0 1121 12z" />

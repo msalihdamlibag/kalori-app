@@ -127,6 +127,8 @@ export async function ensureTables() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS weight REAL`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS height REAL`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(16)`;
+    // When the client last opened their trainer messages (drives the unread badge).
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notes_seen_at TIMESTAMP`;
 
     // Daily logs were originally keyed only by device_id (anonymous). Logged-in
     // users own their logs through user_id; anonymous logs keep it NULL.

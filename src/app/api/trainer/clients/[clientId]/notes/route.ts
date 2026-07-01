@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ensureTables, isDbConfigured } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { createTrainerNote, isTrainerOfClient, listNotesByTrainerForClient } from "@/lib/queries";
+import { sendPushToUser } from "@/lib/notify";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,19 @@ export async function POST(
   }
 
   const note = await createTrainerNote(guard.user.id, clientId, text.slice(0, 2000), suggestedTarget);
+
+  // Notify the client (best-effort; never fail the request over a push error).
+  try {
+    const trainerName = guard.user.name || "Eğitmenin";
+    await sendPushToUser(clientId, {
+      title: `${trainerName} mesaj gönderdi`,
+      body: note.body.length > 120 ? `${note.body.slice(0, 120)}…` : note.body,
+      url: "/",
+    });
+  } catch (e) {
+    console.warn("Not push hatasi:", e);
+  }
+
   return NextResponse.json({ ok: true, note });
 }
 
