@@ -34,26 +34,29 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const text = String(body?.body || "").trim();
   if (!text) {
-    return NextResponse.json({ error: "Mesaj bos olamaz" }, { status: 400 });
+    return NextResponse.json({ error: "İçerik boş olamaz" }, { status: 400 });
   }
+  const kind = body?.kind === "note" ? "note" : "message";
   let suggestedTarget: number | null = null;
-  if (body?.suggestedTarget != null && body.suggestedTarget !== "") {
+  if (kind === "message" && body?.suggestedTarget != null && body.suggestedTarget !== "") {
     const n = Math.round(Number(body.suggestedTarget));
     if (Number.isFinite(n) && n >= 800 && n <= 6000) suggestedTarget = n;
   }
 
-  const note = await createTrainerNote(guard.user.id, clientId, text.slice(0, 2000), suggestedTarget);
+  const note = await createTrainerNote(guard.user.id, clientId, text.slice(0, 2000), suggestedTarget, kind);
 
-  // Notify the client (best-effort; never fail the request over a push error).
-  try {
-    const trainerName = guard.user.name || "Eğitmenin";
-    await sendPushToUser(clientId, {
-      title: `${trainerName} mesaj gönderdi`,
-      body: note.body.length > 120 ? `${note.body.slice(0, 120)}…` : note.body,
-      url: "/",
-    });
-  } catch (e) {
-    console.warn("Not push hatasi:", e);
+  // Only messages reach the client (push + unread badge). Notes stay private.
+  if (kind === "message") {
+    try {
+      const trainerName = guard.user.name || "Eğitmenin";
+      await sendPushToUser(clientId, {
+        title: `${trainerName} mesaj gönderdi`,
+        body: note.body.length > 120 ? `${note.body.slice(0, 120)}…` : note.body,
+        url: "/",
+      });
+    } catch (e) {
+      console.warn("Not push hatasi:", e);
+    }
   }
 
   return NextResponse.json({ ok: true, note });

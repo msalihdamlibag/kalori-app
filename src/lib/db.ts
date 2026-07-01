@@ -65,9 +65,10 @@ export async function ensureTables() {
     // --- Invitations -----------------------------------------------------
     // A trainer mints an invitation carrying a short `code` (embedded in a QR
     // and typeable by hand). A client redeems it to form a trainer_clients link.
-    // --- Trainer notes / messages to a client -----------------------------
-    // One-way trainer → client notes. `suggested_target` is an optional daily
-    // calorie suggestion the client can apply with one tap.
+    // --- Trainer notes / messages about a client --------------------------
+    // `kind` = 'message' (delivered to the client, pushed, counts for the
+    // unread badge) or 'note' (private to the trainer). `suggested_target` is
+    // an optional daily calorie suggestion the client can apply with one tap.
     await sql`
       CREATE TABLE IF NOT EXISTS trainer_notes (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,9 +76,11 @@ export async function ensureTables() {
         client_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         body TEXT NOT NULL,
         suggested_target INTEGER,
+        kind VARCHAR(16) NOT NULL DEFAULT 'message',
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
+    await sql`ALTER TABLE trainer_notes ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'message'`;
     await sql`CREATE INDEX IF NOT EXISTS idx_trainer_notes_client ON trainer_notes(client_id)`;
 
     await sql`
