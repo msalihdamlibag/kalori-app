@@ -7,6 +7,7 @@ interface BottomNavProps {
   onChange: (view: View) => void;
   onAdd: () => void;
   addDisabled?: boolean;
+  profileBadge?: boolean;
 }
 
 function HomeIcon({ active }: { active: boolean }) {
@@ -66,7 +67,7 @@ function NavItem({
   );
 }
 
-export default function BottomNav({ active, onChange, onAdd, addDisabled }: BottomNavProps) {
+export default function BottomNav({ active, onChange, onAdd, addDisabled, profileBadge }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40">
       <div className="bg-card-bg border-t border-border rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.06)] px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -100,7 +101,12 @@ export default function BottomNav({ active, onChange, onAdd, addDisabled }: Bott
             <WorkoutIcon active={active === "workout"} />
           </NavItem>
           <NavItem label="Profil" active={active === "profile"} onClick={() => onChange("profile")}>
-            <ProfileIcon active={active === "profile"} />
+            <span className="relative">
+              <ProfileIcon active={active === "profile"} />
+              {profileBadge && (
+                <span className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-danger ring-2 ring-card-bg" />
+              )}
+            </span>
           </NavItem>
         </div>
       </div>

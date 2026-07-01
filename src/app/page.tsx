@@ -127,6 +127,7 @@ async function syncToDb(
 export default function Home() {
   const { data: session, status } = useSession();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [unreadNotes, setUnreadNotes] = useState(0);
   const claimedRef = useRef(false);
   const [view, setView] = useState<View>("home");
   const [target, setTarget] = useState(2000);
@@ -265,6 +266,24 @@ export default function Home() {
       claimedRef.current = false;
     });
   }, [status, deviceId]);
+
+  // Unread trainer messages badge (clients only).
+  const clientRole = session?.user?.role === "client";
+  useEffect(() => {
+    if (status !== "authenticated" || !clientRole) {
+      setUnreadNotes(0);
+      return;
+    }
+    fetch("/api/notes/unread")
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d) => setUnreadNotes(d.count || 0))
+      .catch(() => {});
+  }, [status, clientRole]);
+
+  const markNotesSeen = useCallback(() => {
+    setUnreadNotes(0);
+    fetch("/api/notes/seen", { method: "POST" }).catch(() => {});
+  }, []);
 
   const consumed = foods.reduce((sum, f) => sum + f.calories, 0);
   const protein = foods.reduce((s, f) => s + (f.protein || 0), 0);
@@ -663,11 +682,13 @@ export default function Home() {
             }
             onLogin={() => setLoginOpen(true)}
             onApplyTarget={(t) => saveGoal(t, macrosFromCalories(t))}
+            unreadNotes={unreadNotes}
+            onNotesSeen={markNotesSeen}
           />
         )}
       </main>
 
-      <BottomNav active={view} onChange={setView} onAdd={() => setAddMenuOpen(true)} addDisabled={analyzing} />
+      <BottomNav active={view} onChange={setView} onAdd={() => setAddMenuOpen(true)} addDisabled={analyzing} profileBadge={unreadNotes > 0} />
 
       {loginOpen && <LoginSheet onClose={() => setLoginOpen(false)} />}
     </div>

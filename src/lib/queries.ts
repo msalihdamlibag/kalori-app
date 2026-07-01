@@ -240,6 +240,27 @@ export async function listPushSubscriptions(): Promise<PushSub[]> {
   return res.rows.map((r) => ({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }));
 }
 
+export async function listPushSubscriptionsForUser(userId: string): Promise<PushSub[]> {
+  const res = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ${userId}`;
+  return res.rows.map((r) => ({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }));
+}
+
+// Count trainer notes newer than the client's last "seen" timestamp.
+export async function countUnreadNotes(clientId: string): Promise<number> {
+  const res = await sql`
+    SELECT COUNT(*)::int AS n
+    FROM trainer_notes tn
+    JOIN users u ON u.id = ${clientId}
+    WHERE tn.client_id = ${clientId}
+      AND (u.notes_seen_at IS NULL OR tn.created_at > u.notes_seen_at)
+  `;
+  return res.rows[0]?.n ?? 0;
+}
+
+export async function markNotesSeen(clientId: string): Promise<void> {
+  await sql`UPDATE users SET notes_seen_at = NOW() WHERE id = ${clientId}`;
+}
+
 export interface TrainerNote {
   id: string;
   body: string;
