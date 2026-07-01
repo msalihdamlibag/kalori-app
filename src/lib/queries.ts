@@ -252,6 +252,7 @@ export async function countUnreadNotes(clientId: string): Promise<number> {
     FROM trainer_notes tn
     JOIN users u ON u.id = ${clientId}
     WHERE tn.client_id = ${clientId}
+      AND tn.kind = 'message'
       AND (u.notes_seen_at IS NULL OR tn.created_at > u.notes_seen_at)
   `;
   return res.rows[0]?.n ?? 0;
@@ -261,10 +262,13 @@ export async function markNotesSeen(clientId: string): Promise<void> {
   await sql`UPDATE users SET notes_seen_at = NOW() WHERE id = ${clientId}`;
 }
 
+export type NoteKind = "message" | "note";
+
 export interface TrainerNote {
   id: string;
   body: string;
   suggestedTarget: number | null;
+  kind: NoteKind;
   createdAt: string;
   trainerName?: string | null;
 }
@@ -273,25 +277,25 @@ export async function createTrainerNote(
   trainerId: string,
   clientId: string,
   body: string,
-  suggestedTarget: number | null
+  suggestedTarget: number | null,
+  kind: NoteKind
 ): Promise<TrainerNote> {
   const res = await sql`
-    INSERT INTO trainer_notes (trainer_id, client_id, body, suggested_target)
-    VALUES (${trainerId}, ${clientId}, ${body}, ${suggestedTarget})
-    RETURNING id, body, suggested_target, created_at
+    INSERT INTO trainer_notes (trainer_id, client_id, body, suggested_target, kind)
+    VALUES (${trainerId}, ${clientId}, ${body}, ${suggestedTarget}, ${kind})
+    RETURNING id, body, suggested_target, kind, created_at
   `;
   const r = res.rows[0];
-  return { id: r.id, body: r.body, suggestedTarget: r.suggested_target, createdAt: r.created_at };
+  return { id: r.id, body: r.body, suggestedTarget: r.suggested_target, kind: r.kind, createdAt: r.created_at };
 }
 
-// Notes for a client (most recent first). trainerName is included so the client
-// sees who wrote it.
+// Messages delivered to a client (private trainer notes are excluded).
 export async function listNotesForClient(clientId: string): Promise<TrainerNote[]> {
   const res = await sql`
-    SELECT n.id, n.body, n.suggested_target, n.created_at, u.name AS trainer_name
+    SELECT n.id, n.body, n.suggested_target, n.kind, n.created_at, u.name AS trainer_name
     FROM trainer_notes n
     JOIN users u ON u.id = n.trainer_id
-    WHERE n.client_id = ${clientId}
+    WHERE n.client_id = ${clientId} AND n.kind = 'message'
     ORDER BY n.created_at DESC
     LIMIT 100
   `;
@@ -299,18 +303,19 @@ export async function listNotesForClient(clientId: string): Promise<TrainerNote[
     id: r.id,
     body: r.body,
     suggestedTarget: r.suggested_target,
+    kind: r.kind,
     createdAt: r.created_at,
     trainerName: r.trainer_name,
   }));
 }
 
-// Notes a specific trainer wrote for a specific client.
+// Everything (notes + messages) a trainer recorded for a client.
 export async function listNotesByTrainerForClient(
   trainerId: string,
   clientId: string
 ): Promise<TrainerNote[]> {
   const res = await sql`
-    SELECT id, body, suggested_target, created_at
+    SELECT id, body, suggested_target, kind, created_at
     FROM trainer_notes
     WHERE trainer_id = ${trainerId} AND client_id = ${clientId}
     ORDER BY created_at DESC
@@ -320,6 +325,7 @@ export async function listNotesByTrainerForClient(
     id: r.id,
     body: r.body,
     suggestedTarget: r.suggested_target,
+    kind: r.kind,
     createdAt: r.created_at,
   }));
 }
