@@ -38,7 +38,6 @@ src/
 ├── components/
 │   ├── BottomNav.tsx        # Bottom tab bar (Home/Goal/+/Workout/Profile) + center add FAB
 │   ├── SummaryCard.tsx      # Home "Özet" card: consumed total, target gauge ring, macro bars
-│   ├── FreeAccessBanner.tsx # Home free-trial countdown banner
 │   ├── StorySection.tsx     # Home "Hikaye" curated recipe story cards
 │   ├── GoalView.tsx         # Goal tab: edit calorie + macro targets (exports macrosFromCalories)
 │   ├── WorkoutView.tsx      # Workout tab: AI exercise suggestions for a burn goal

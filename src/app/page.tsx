@@ -6,7 +6,6 @@ import { FoodItem } from "@/components/FoodLog";
 import TodayMeals from "@/components/TodayMeals";
 import BottomNav, { View } from "@/components/BottomNav";
 import SummaryCard from "@/components/SummaryCard";
-import FreeAccessBanner from "@/components/FreeAccessBanner";
 import GoalView, { MacroTargets, macrosFromCalories } from "@/components/GoalView";
 import WorkoutView from "@/components/WorkoutView";
 import ProfileView from "@/components/ProfileView";
@@ -704,7 +703,6 @@ export default function Home() {
               fat={fat}
               macroTargets={macroTargets}
             />
-            <FreeAccessBanner daysLeft={daysLeft} totalDays={FREE_TRIAL_DAYS} />
             <div>
               <h2 className="text-xl font-extrabold mb-3">Bugün Yediklerim</h2>
               <TodayMeals items={foods} onRemove={removeFood} />
