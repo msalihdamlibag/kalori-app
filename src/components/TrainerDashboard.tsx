@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
 import TrainerClientNotes from "./TrainerClientNotes";
+import PushToggle from "./PushToggle";
 
 interface TrainerClient {
   id: string;
@@ -328,6 +329,10 @@ export default function TrainerDashboard() {
           })}
         </div>
       )}
+
+      <div className="mt-6">
+        <PushToggle description="Her akşam danışan verilerini kontrol etmeyi hatırlat" />
+      </div>
 
       {/* Invitation modal */}
       {invite && (
