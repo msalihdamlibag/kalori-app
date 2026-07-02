@@ -104,6 +104,37 @@ function stripInlineImages(foods: FoodItem[]): FoodItem[] {
   return foods.map((f) => (f.imageUrl?.startsWith("data:") ? { ...f, imageUrl: undefined } : f));
 }
 
+// When today's foods are missing locally (fresh browser, storage cleared
+// around a sign-out/in, new device), pull today's log back from the DB so the
+// day's records don't vanish. Signed-in users get their account's log; the
+// deviceId covers the anonymous case.
+async function fetchTodayFromDb(deviceId: string): Promise<{
+  target: number;
+  macroTargets: MacroTargets | null;
+  foods: FoodItem[];
+} | null> {
+  try {
+    const res = await fetch(`/api/history?deviceId=${encodeURIComponent(deviceId)}&limit=5`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const today = getTodayStr();
+    const day = (data.days || []).find(
+      (d: { date: string }) => String(d.date).slice(0, 10) === today
+    );
+    if (!day || !Array.isArray(day.foods) || day.foods.length === 0) return null;
+    return {
+      target: Number(day.target) || 0,
+      macroTargets: day.macroTargets ?? null,
+      foods: day.foods.map((f: FoodItem & { imageUrl: string | null }) => ({
+        ...f,
+        imageUrl: f.imageUrl ?? undefined,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function syncToDb(
   deviceId: string,
   date: string,
@@ -150,6 +181,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState("");
   const [registerDate, setRegisterDate] = useState("");
+  // Blocks persistence/sync until today's state is loaded (from localStorage
+  // or restored from the DB) so an empty initial state can't wipe the DB row.
+  const [hydrated, setHydrated] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -165,6 +199,38 @@ export default function Home() {
     const savedDate = localStorage.getItem(STORAGE_KEY_DATE);
     const today = getTodayStr();
 
+    // Re-attach on-device photos that were stripped before persisting.
+    const attachLocalPhotos = (items: FoodItem[]) => {
+      const missing = items.filter((f) => !f.imageUrl).map((f) => f.id);
+      if (!missing.length) return;
+      getPhotos(missing).then((local) => {
+        if (Object.keys(local).length === 0) return;
+        setFoods((prev) =>
+          prev.map((f) => (!f.imageUrl && local[f.id] ? { ...f, imageUrl: local[f.id] } : f))
+        );
+      });
+    };
+
+    // No local record of today (fresh browser, storage cleared around a
+    // sign-out/in): try to restore it from the DB before allowing syncs, so
+    // the day's data survives instead of being overwritten by an empty state.
+    const restoreToday = async () => {
+      const day = await fetchTodayFromDb(id);
+      if (day) {
+        setFoods(day.foods);
+        if (!localStorage.getItem(STORAGE_KEY_TARGET) && day.target > 0) {
+          setTarget(day.target);
+          localStorage.setItem(STORAGE_KEY_TARGET, String(day.target));
+        }
+        if (!localStorage.getItem(STORAGE_KEY_MACROS) && day.macroTargets) {
+          setMacroTargets(day.macroTargets);
+          localStorage.setItem(STORAGE_KEY_MACROS, JSON.stringify(day.macroTargets));
+        }
+        attachLocalPhotos(day.foods);
+      }
+      setHydrated(true);
+    };
+
     if (savedDate !== today) {
       const oldFoods = localStorage.getItem(STORAGE_KEY_FOODS);
       if (savedDate && oldFoods) {
@@ -174,21 +240,17 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEY_DATE, today);
       localStorage.removeItem(STORAGE_KEY_FOODS);
       setFoods([]);
+      // Another device may already have logged food for today.
+      restoreToday();
     } else {
       const saved = localStorage.getItem(STORAGE_KEY_FOODS);
-      if (saved) {
-        const parsed: FoodItem[] = JSON.parse(saved);
+      const parsed: FoodItem[] = saved ? JSON.parse(saved) : [];
+      if (parsed.length) {
         setFoods(parsed);
-        // Re-attach on-device photos that were stripped from localStorage.
-        const missing = parsed.filter((f) => !f.imageUrl).map((f) => f.id);
-        if (missing.length) {
-          getPhotos(missing).then((local) => {
-            if (Object.keys(local).length === 0) return;
-            setFoods((prev) =>
-              prev.map((f) => (!f.imageUrl && local[f.id] ? { ...f, imageUrl: local[f.id] } : f))
-            );
-          });
-        }
+        attachLocalPhotos(parsed);
+        setHydrated(true);
+      } else {
+        restoreToday();
       }
     }
 
@@ -220,6 +282,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Don't persist or sync until today's state is hydrated — otherwise the
+    // initial empty list would overwrite the day's record in the DB.
+    if (!hydrated) return;
     try {
       // Keep inline photos when they fit so they persist across reloads.
       localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(foods));
@@ -251,7 +316,7 @@ export default function Home() {
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
     };
-  }, [foods, deviceId, target, macroTargets]);
+  }, [foods, deviceId, target, macroTargets, hydrated]);
 
   // On first login, attach this device's anonymous logs to the account so the
   // user's existing history follows them (and becomes visible to a trainer).
