@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import HistoryView from "./HistoryView";
 import RecipeSuggestions from "./RecipeSuggestions";
@@ -11,6 +11,14 @@ interface ProfileUser {
   email: string | null;
   image: string | null;
   role: "client" | "trainer" | null;
+}
+
+interface LinkedTrainer {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  since: string;
 }
 
 interface ProfileViewProps {
@@ -105,6 +113,23 @@ export default function ProfileView({
 }: ProfileViewProps) {
   const [section, setSection] = useState<Section>("overview");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [myTrainers, setMyTrainers] = useState<LinkedTrainer[] | null>(null);
+
+  const isClient = user?.role === "client";
+
+  const loadMyTrainers = useCallback(() => {
+    if (!isClient) return;
+    fetch("/api/my-trainer")
+      .then((r) => (r.ok ? r.json() : { trainers: [] }))
+      .then((d) => setMyTrainers(d.trainers || []))
+      .catch(() => setMyTrainers([]));
+  }, [isClient]);
+
+  useEffect(() => {
+    loadMyTrainers();
+  }, [loadMyTrainers]);
+
+  const linkedTrainer = myTrainers && myTrainers.length > 0 ? myTrainers[0] : null;
 
   const openNotes = () => {
     setSection("notes");
@@ -132,8 +157,11 @@ export default function ProfileView({
   if (section === "connect") {
     return (
       <div>
-        <SubHeader title="Eğitmene Bağlan" onBack={() => setSection("overview")} />
-        <ConnectTrainer />
+        <SubHeader
+          title={linkedTrainer ? "Eğitmenim" : "Eğitmene Bağlan"}
+          onBack={() => setSection("overview")}
+        />
+        <TrainerLink trainers={myTrainers} onChanged={loadMyTrainers} />
       </div>
     );
   }
@@ -184,6 +212,14 @@ export default function ProfileView({
                 ? `${daysLeft} gün ücretsiz erişim kaldı`
                 : "Ücretsiz deneme bitti"}
           </div>
+          {linkedTrainer && (
+            <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-accent-strong bg-accent/30 rounded-full px-2 py-0.5 max-w-full">
+              <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="truncate">{linkedTrainer.name || linkedTrainer.email || "Eğitmenine bağlı"}</span>
+            </div>
+          )}
         </div>
         {!user && (
           <button
@@ -261,8 +297,12 @@ export default function ProfileView({
         {user?.role === "client" && (
           <MenuRow
             onClick={() => setSection("connect")}
-            label="Eğitmene Bağlan"
-            sub="Davet kodu ile eğitmeninle eşleş"
+            label={linkedTrainer ? "Eğitmenim" : "Eğitmene Bağlan"}
+            sub={
+              linkedTrainer
+                ? linkedTrainer.name || linkedTrainer.email || "Bağlı"
+                : "Davet kodu ile eğitmeninle eşleş"
+            }
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-2.13a4 4 0 10-4-4 4 4 0 004 4z" />
@@ -337,10 +377,20 @@ export default function ProfileView({
 }
 
 // Client-side form to redeem a trainer's invitation code.
-function ConnectTrainer() {
+// Shows the client's linked trainer(s) with a remove option, or the invite-code
+// form when not yet connected.
+function TrainerLink({
+  trainers,
+  onChanged,
+}: {
+  trainers: LinkedTrainer[] | null;
+  onChanged: () => void;
+}) {
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<LinkedTrainer | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const submit = async () => {
     const trimmed = code.trim().toUpperCase();
@@ -355,27 +405,106 @@ function ConnectTrainer() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Bağlanılamadı");
-      setStatus("done");
+      setCode("");
+      onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bağlanılamadı");
+    } finally {
       setStatus("idle");
     }
   };
 
-  if (status === "done") {
+  const remove = async (t: LinkedTrainer) => {
+    if (removing) return;
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/my-trainer", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trainerId: t.id }),
+      });
+      if (!res.ok) throw new Error();
+      setConfirmRemove(null);
+      onChanged();
+    } catch {
+      setError("Bağlantı kaldırılamadı");
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  if (trainers === null) {
     return (
-      <div className="bg-surface rounded-3xl p-6 text-center">
-        <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-accent/40 flex items-center justify-center">
-          <svg className="w-7 h-7 text-accent-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h3 className="font-bold text-sm mb-1">Eğitmenine bağlandın</h3>
-        <p className="text-xs text-muted">Eğitmenin artık günlük kayıtlarını görebilir.</p>
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-accent-strong border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  // --- Connected: show trainer(s) + remove ---------------------------------
+  if (trainers.length > 0) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted">
+          Aşağıdaki eğitmen(ler) günlük kalori ve öğün kayıtlarını (fotoğraflar dahil) görebilir.
+        </p>
+        {trainers.map((t) => (
+          <div key={t.id} className="bg-surface rounded-3xl p-4 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+              {t.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={t.image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-2.13a4 4 0 10-4-4 4 4 0 004 4z" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm truncate">{t.name || t.email || "Eğitmen"}</div>
+              {t.email && <div className="text-xs text-muted truncate">{t.email}</div>}
+            </div>
+            <button
+              onClick={() => setConfirmRemove(t)}
+              className="shrink-0 text-xs font-semibold text-danger px-3 py-2 rounded-xl bg-danger/10 active:scale-95 transition-transform"
+            >
+              Kaldır
+            </button>
+          </div>
+        ))}
+        {error && <p className="text-sm text-danger text-center">{error}</p>}
+
+        {confirmRemove && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-card-bg rounded-2xl p-6 w-full max-w-sm shadow-xl animate-scale-in">
+              <h2 className="font-bold text-lg mb-2">Bağlantıyı kaldır?</h2>
+              <p className="text-sm text-muted mb-5">
+                {confirmRemove.name || confirmRemove.email || "Bu eğitmen"} artık kayıtlarını göremeyecek.
+                Dilersen tekrar davet kabul ederek bağlanabilirsin.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmRemove(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-border font-semibold text-sm active:bg-surface transition-colors"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={() => remove(confirmRemove)}
+                  disabled={removing}
+                  className="flex-1 py-2.5 rounded-xl bg-danger text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-60"
+                >
+                  {removing ? "Kaldırılıyor..." : "Kaldır"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Not connected: invite-code form -------------------------------------
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">

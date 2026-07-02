@@ -343,6 +343,32 @@ export async function revokeTrainerClient(
   return (res.rowCount ?? 0) > 0;
 }
 
+export interface LinkedTrainer {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  since: string;
+}
+
+// The trainers a client is actively linked to.
+export async function listClientTrainers(clientId: string): Promise<LinkedTrainer[]> {
+  const res = await sql`
+    SELECT u.id, u.name, u.email, u.image, tc.created_at AS since
+    FROM trainer_clients tc
+    JOIN users u ON u.id = tc.trainer_id
+    WHERE tc.client_id = ${clientId} AND tc.status = 'active'
+    ORDER BY tc.created_at ASC
+  `;
+  return res.rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    image: r.image,
+    since: r.since,
+  }));
+}
+
 // Does an active trainer<->client link exist between these two users?
 export async function isTrainerOfClient(
   trainerId: string,
