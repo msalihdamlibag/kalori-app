@@ -53,48 +53,106 @@ function todayStr() {
   return localDateStr();
 }
 
-// Compact 7-day calorie bars with the target as a faint reference line.
-// The 7 dates (YYYY-MM-DD) of the current week, Monday → Sunday, in app-local
-// time. We anchor on the local calendar date so the week matches the days the
-// user actually logged under.
-function currentWeekMonToSun(): string[] {
-  const [y, m, d] = todayStr().split("-").map(Number);
-  // Midnight UTC of today's local calendar date — used only to derive the
-  // weekday and step day-by-day; the emitted strings stay calendar dates.
-  const base = Date.UTC(y, m - 1, d);
-  const sinceMon = (new Date(base).getUTCDay() + 6) % 7; // Mon=0 … Sun=6
-  const monday = base - sinceMon * 86400000;
-  return Array.from({ length: 7 }, (_, i) =>
-    new Date(monday + i * 86400000).toISOString().slice(0, 10)
-  );
-}
-
 const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
-// Fixed Monday→Sunday calorie bar chart for the current week, built from the
-// loaded history. Days without a log render as a thin empty column; today's
-// bar is highlighted, over-target days are red, and a dashed line marks the
-// (most recent) calorie target.
-function WeeklyTrend({ days }: { days: HistoryDay[] }) {
+// --- Calendar-date helpers (UTC-based on the local calendar date string) ---
+function ymdToUTC(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function utcToYmd(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+function enumerateDates(startYmd: string, endYmd: string): string[] {
+  const out: string[] = [];
+  const end = ymdToUTC(endYmd);
+  for (let t = ymdToUTC(startYmd); t <= end; t += 86400000) out.push(utcToYmd(t));
+  return out;
+}
+function weekStartYmd(ymd: string): string {
+  const t = ymdToUTC(ymd);
+  const sinceMon = (new Date(t).getUTCDay() + 6) % 7;
+  return utcToYmd(t - sinceMon * 86400000);
+}
+
+interface TrendBar {
+  key: string;
+  label: string;
+  value: number;
+  target: number;
+  hasData: boolean;
+  isCurrent: boolean;
+  showValue: boolean;
+}
+
+// Calorie trend for the selected range. Short ranges (≤14 days) render one bar
+// per day; longer ranges collapse into weekly averages so the chart stays
+// readable. Over-target bars are red, the current day/week is highlighted, and
+// a dashed line marks the (most recent) calorie target.
+function RangeTrend({ days, rangeDays }: { days: HistoryDay[]; rangeDays: number | null }) {
   const byDate = new Map(days.map((d) => [String(d.date).slice(0, 10), d]));
-  const fallbackTarget = days[0]?.target ?? 2000;
   const today = todayStr();
+  const fallbackTarget = days[0]?.target ?? 2000;
 
-  const week = currentWeekMonToSun().map((date, i) => {
-    const d = byDate.get(date);
-    return {
-      date,
-      label: WEEKDAY_LABELS[i],
-      totalCalories: d?.totalCalories ?? 0,
-      target: d?.target ?? fallbackTarget,
-      hasData: !!d && d.totalCalories > 0,
-      isFuture: date > today,
-    };
-  });
+  let startYmd: string;
+  if (rangeDays) {
+    startYmd = utcToYmd(ymdToUTC(today) - (rangeDays - 1) * 86400000);
+  } else {
+    const sorted = [...byDate.keys()].sort();
+    startYmd = sorted[0] || today;
+  }
+  const dayList = enumerateDates(startYmd, today);
+  const daily = dayList.length <= 14;
 
-  const max = Math.max(...week.map((d) => Math.max(d.totalCalories, d.target)), 1);
-  // Scale bars to ~82% of the plot so the value label above the tallest bar
-  // still fits inside the card.
+  let bars: TrendBar[];
+  let title: string;
+
+  if (daily) {
+    title = "Günlük Trend";
+    const useWeekday = dayList.length <= 8;
+    bars = dayList.map((date) => {
+      const d = byDate.get(date);
+      return {
+        key: date,
+        label: useWeekday
+          ? WEEKDAY_LABELS[(new Date(ymdToUTC(date)).getUTCDay() + 6) % 7]
+          : String(Number(date.slice(8, 10))),
+        value: d?.totalCalories ?? 0,
+        target: d?.target ?? fallbackTarget,
+        hasData: !!d && d.totalCalories > 0,
+        isCurrent: date === today,
+        showValue: useWeekday,
+      };
+    });
+  } else {
+    title = "Haftalık Trend";
+    const weeks = new Map<string, { sum: number; count: number; targetMax: number }>();
+    for (const date of dayList) {
+      const ws = weekStartYmd(date);
+      const w = weeks.get(ws) || { sum: 0, count: 0, targetMax: 0 };
+      const d = byDate.get(date);
+      if (d && d.totalCalories > 0) {
+        w.sum += d.totalCalories;
+        w.count++;
+      }
+      w.targetMax = Math.max(w.targetMax, d?.target ?? fallbackTarget);
+      weeks.set(ws, w);
+    }
+    let entries = [...weeks.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    if (entries.length > 16) entries = entries.slice(entries.length - 16);
+    const currentWeek = weekStartYmd(today);
+    bars = entries.map(([ws, w]) => ({
+      key: ws,
+      label: new Date(ymdToUTC(ws)).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
+      value: w.count ? Math.round(w.sum / w.count) : 0,
+      target: w.targetMax || fallbackTarget,
+      hasData: w.count > 0,
+      isCurrent: ws === currentWeek,
+      showValue: entries.length <= 8,
+    }));
+  }
+
+  const max = Math.max(...bars.map((b) => Math.max(b.value, b.target)), 1);
   const SCALE = 82;
   const targetLinePct = Math.min((fallbackTarget / max) * SCALE, SCALE);
 
@@ -106,53 +164,53 @@ function WeeklyTrend({ days }: { days: HistoryDay[] }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V11m5 5V7m5 9v-3M4 20h16" />
           </svg>
         </div>
-        <span className="text-[11px] font-bold text-muted uppercase tracking-wider">Haftalık Trend</span>
+        <span className="text-[11px] font-bold text-muted uppercase tracking-wider">{title}</span>
+        {!daily && <span className="text-[10px] text-muted normal-case">haftalık ortalama</span>}
       </div>
 
       {/* Bars: container has an explicit height so % bar heights resolve. */}
-      <div className="relative h-32 flex items-end gap-1.5">
+      <div className="relative h-32 flex items-end gap-1">
         <div
           className="absolute inset-x-0 border-t border-dashed border-muted/40 z-0"
           style={{ bottom: `${targetLinePct}%` }}
         />
-        {week.map((d) => {
-          const pct = d.hasData ? Math.max((d.totalCalories / max) * SCALE, 5) : 0;
-          const isOver = d.totalCalories > d.target;
-          const isToday = d.date === today;
+        {bars.map((b) => {
+          const pct = b.hasData ? Math.max((b.value / max) * SCALE, 5) : 0;
+          const isOver = b.value > b.target;
           return (
-            <div key={d.date} className="relative z-10 flex-1 h-full flex flex-col items-center justify-end gap-1">
-              {d.hasData && (
+            <div key={b.key} className="relative z-10 flex-1 h-full flex flex-col items-center justify-end gap-1">
+              {b.hasData && b.showValue && (
                 <span className={`text-[8px] font-bold leading-none ${isOver ? "text-danger" : "text-foreground/70"}`}>
-                  {d.totalCalories}
+                  {b.value}
                 </span>
               )}
               <div
                 className={`w-full rounded-t-lg transition-all duration-500 ${
-                  !d.hasData
+                  !b.hasData
                     ? "bg-border/60"
                     : isOver
                       ? "bg-danger"
-                      : isToday
+                      : b.isCurrent
                         ? "bg-accent-strong"
                         : "bg-accent-dark"
                 }`}
-                style={{ height: `${Math.max(pct, d.hasData ? 5 : 2)}%` }}
+                style={{ height: `${Math.max(pct, b.hasData ? 5 : 2)}%` }}
               />
             </div>
           );
         })}
       </div>
 
-      {/* Weekday labels */}
-      <div className="flex gap-1.5 mt-2">
-        {week.map((d) => (
+      {/* Labels */}
+      <div className="flex gap-1 mt-2">
+        {bars.map((b) => (
           <span
-            key={d.date}
-            className={`flex-1 text-center text-[10px] ${
-              d.date === today ? "font-bold text-foreground" : "text-muted"
+            key={b.key}
+            className={`flex-1 text-center text-[9px] truncate ${
+              b.isCurrent ? "font-bold text-foreground" : "text-muted"
             }`}
           >
-            {d.label}
+            {b.label}
           </span>
         ))}
       </div>
@@ -349,12 +407,18 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
     );
   }
 
-  // Weekly averages
-  const last7 = days.slice(0, 7);
-  const avgCalories = Math.round(last7.reduce((s, d) => s + d.totalCalories, 0) / last7.length);
-  const avgProtein = Math.round(last7.reduce((s, d) => s + d.totalProtein, 0) / last7.length);
-  const avgCarbs = Math.round(last7.reduce((s, d) => s + d.totalCarbs, 0) / last7.length);
-  const avgFat = Math.round(last7.reduce((s, d) => s + d.totalFat, 0) / last7.length);
+  // Averages over the selected range (trainer) or the last 7 logged days (self).
+  const statDays = showDateFilter ? days : days.slice(0, 7);
+  const avgN = Math.max(statDays.length, 1);
+  const avgCalories = Math.round(statDays.reduce((s, d) => s + d.totalCalories, 0) / avgN);
+  const avgProtein = Math.round(statDays.reduce((s, d) => s + d.totalProtein, 0) / avgN);
+  const avgCarbs = Math.round(statDays.reduce((s, d) => s + d.totalCarbs, 0) / avgN);
+  const avgFat = Math.round(statDays.reduce((s, d) => s + d.totalFat, 0) / avgN);
+  const avgTitle = showDateFilter
+    ? rangeDays
+      ? `Son ${rangeDays} Gün Ortalaması`
+      : "Tüm Zamanlar Ortalaması"
+    : `Son ${statDays.length} Gün Ortalaması`;
 
   return (
     <>
@@ -396,7 +460,7 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
               </svg>
             </div>
             <span className="text-[11px] font-bold text-muted uppercase tracking-wider">
-              Son {last7.length} Gün Ortalaması
+              {avgTitle}
             </span>
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -417,8 +481,8 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
           </div>
         </div>
 
-        {/* Weekly trend chart (Mon → Sun) */}
-        {showTodaySummary && <WeeklyTrend days={days} />}
+        {/* Calorie trend over the selected range */}
+        {showTodaySummary && <RangeTrend days={days} rangeDays={rangeDays} />}
 
         {/* Day list */}
         <div className="space-y-2">
