@@ -42,7 +42,7 @@ export async function isSubscribed(): Promise<boolean> {
 }
 
 // Request permission (if needed), subscribe, and persist to the server.
-export async function subscribeToPush(deviceId: string): Promise<{ ok: boolean; error?: string }> {
+export async function subscribeToPush(deviceId: string | null): Promise<{ ok: boolean; error?: string }> {
   if (!pushSupported()) return { ok: false, error: "Bu cihaz bildirimleri desteklemiyor" };
   try {
     const permission = await Notification.requestPermission();

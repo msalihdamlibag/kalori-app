@@ -6,7 +6,9 @@ import { sendPushToSubscriptions } from "@/lib/notify";
 export const runtime = "nodejs";
 
 // Daily reminder push. Triggered by the Vercel cron (see vercel.json). Sends a
-// "log your meals" nudge to every stored subscription and prunes dead ones.
+// role-appropriate nudge to every stored subscription and prunes dead ones:
+// trainers get a "check your clients' data" reminder, everyone else the
+// "log your meals" one.
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
@@ -21,11 +23,26 @@ export async function GET(req: NextRequest) {
 
   await ensureTables();
   const subs = await listPushSubscriptions();
-  const result = await sendPushToSubscriptions(subs, {
-    title: "KaloriTakip",
-    body: "Bugünkü öğünlerini eklemeyi unutma! 🍽️",
-    url: "/",
-  });
+  const trainerSubs = subs.filter((s) => s.role === "trainer");
+  const clientSubs = subs.filter((s) => s.role !== "trainer");
 
-  return NextResponse.json({ ok: true, total: subs.length, ...result });
+  const [trainerResult, clientResult] = await Promise.all([
+    sendPushToSubscriptions(trainerSubs, {
+      title: "KaloriTakip",
+      body: "Danışanlarının bugünkü verilerini kontrol etmeyi unutma! 📊",
+      url: "/",
+    }),
+    sendPushToSubscriptions(clientSubs, {
+      title: "KaloriTakip",
+      body: "Bugünkü öğünlerini eklemeyi unutma! 🍽️",
+      url: "/",
+    }),
+  ]);
+
+  return NextResponse.json({
+    ok: true,
+    total: subs.length,
+    sent: trainerResult.sent + clientResult.sent,
+    removed: trainerResult.removed + clientResult.removed,
+  });
 }

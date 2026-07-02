@@ -235,9 +235,20 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
   await sql`DELETE FROM push_subscriptions WHERE endpoint = ${endpoint}`;
 }
 
-export async function listPushSubscriptions(): Promise<PushSub[]> {
-  const res = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
-  return res.rows.map((r) => ({ endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth }));
+// All subscriptions with the subscriber's role (null for anonymous devices),
+// so the daily reminder can word its message per role.
+export async function listPushSubscriptions(): Promise<(PushSub & { role: string | null })[]> {
+  const res = await sql`
+    SELECT ps.endpoint, ps.p256dh, ps.auth, u.role
+    FROM push_subscriptions ps
+    LEFT JOIN users u ON u.id = ps.user_id
+  `;
+  return res.rows.map((r) => ({
+    endpoint: r.endpoint,
+    p256dh: r.p256dh,
+    auth: r.auth,
+    role: r.role ?? null,
+  }));
 }
 
 export async function listPushSubscriptionsForUser(userId: string): Promise<PushSub[]> {
