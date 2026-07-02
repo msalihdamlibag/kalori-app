@@ -12,8 +12,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "KaloriTakip";
   const options = {
     body: data.body || "Bugünkü öğünlerini eklemeyi unutma!",
-    icon: "/icon-192.svg",
-    badge: "/icon-192.svg",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     data: { url: data.url || "/" },
   };
   event.waitUntil(self.registration.showNotification(title, options));
