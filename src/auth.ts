@@ -33,7 +33,14 @@ async function buildConfig(): Promise<NextAuthConfig> {
 
   return {
     trustHost: true,
-    session: { strategy: "jwt" },
+    // Long, rolling session: the cookie lasts 60 days and its expiry is
+    // extended (at most once a day) on any visit, so active users aren't
+    // logged out prematurely.
+    session: {
+      strategy: "jwt",
+      maxAge: 60 * 60 * 24 * 60, // 60 days
+      updateAge: 60 * 60 * 24, // refresh at most daily
+    },
     providers,
     callbacks: {
       // Upsert the user row on every sign-in and stash the DB id/role so the
