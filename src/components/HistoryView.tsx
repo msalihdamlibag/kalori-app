@@ -437,9 +437,8 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
       )}
 
       <div className="space-y-4">
-        {rangeFilter}
-
-        {/* Trainer view: today's goal/macro summary */}
+        {/* Trainer view: today's goal/macro summary (kept above the range
+            filter so it sits right under the notes/messages card) */}
         {showTodaySummary && days[0]?.date && String(days[0].date).slice(0, 10) === todayStr() && (
           <SummaryCard
             consumed={days[0].totalCalories}
@@ -450,6 +449,8 @@ export default function HistoryView({ deviceId, clientId, showTodaySummary }: Hi
             macroTargets={days[0].macroTargets ?? deriveMacros(days[0].target)}
           />
         )}
+
+        {rangeFilter}
 
         {/* Weekly averages (directly under the daily summary) */}
         <div className="bg-card-bg rounded-3xl p-4 border border-border shadow-sm">
